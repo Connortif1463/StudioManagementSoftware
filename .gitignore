@@ -1,14 +1,40 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
 project_history.json
 project_manager.log
-__pycache__/filesys.cpython-37.pyc
-__pycache__/history.cpython-37.pyc
-__pycache__/sessions.cpython-37.pyc
-artists/connor fischetti/bruh/protools/protools template.ptx
-artists/homegrown homunculus/bruh moment III/protools/protools template.ptx
-templates/ableton templates/ableton template.als
-templates/logic templates/logic template.logicx
-templates/protools templates/protools template.ptx
-version2/filesys.py
-version2/history.py
-version2/main.py
-version2/sessions.py
+session_logs/
+artists/
+
+# Backups (if you create any)
+*_backup_*/
+*.backup
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Environment
+.env
+venv/
+env/
+.venv/
+
+# Logs
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Python package files
+*.egg-info/
+dist/
+build/
