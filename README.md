@@ -6,7 +6,7 @@ A comprehensive project management system for music studios, designed to track s
 - Python 3.7 or higher
 - pip (Python package manager)
 
-## Install from GitHub
+### Install from GitHub
 
 ```bash
 git clone https://github.com/yourusername/StudioManagementSoftware.git
@@ -20,30 +20,3 @@ pip install -r requirements.txt
 ```bash
 python3 run.py
 ```
-
-### Project Files Structure
-
-```
-artists/
-└── Artist Name/
-    └── Project Name/
-        ├── production/
-        │   └── project_production_session.als
-        ├── mix/
-        │   └── project_mix_session.ptx
-        ├── master/
-        │   └── project_master_session.ptx
-        ├── finished/
-        │   └── final_master.wav
-        └── .project_tracker.json
-```
-
-## DAW Templates
-
-Place your DAW template files in the `templates/` folder:
-
-- `templates/ableton templates/ableton template.als`
-- `templates/protools templates/protools template.ptx`
-- `templates/logic templates/logic template.logicx`
-
-When creating a new project, the template will be copied to the appropriate stage folder.
