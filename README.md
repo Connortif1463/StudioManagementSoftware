@@ -1,7 +1,5 @@
 # Studio Management System
 
-A comprehensive project management system for music studios, designed to track songs, albums, sessions, and project stages from production to mastering.
-
 ### Prerequisites
 - Python 3.7 or higher
 - pip (Python package manager)
