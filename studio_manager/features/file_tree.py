@@ -1,12 +1,14 @@
 from pathlib import Path
-from ..cli.display import print_header, print_error, print_info, clear_screen
+from rich.panel import Panel
+from ..cli.display import console, clear_screen, print_error, print_info
 from ..cli.menu import show_file_tree_options
 
 def file_tree_flow():
     """Handle file tree display flow"""
     from ..core.file_system import print_directory_tree, print_full_project_tree
     
-    print_header("File Tree Viewer")
+    clear_screen()
+    console.print(Panel.fit("[bold white]File Tree Viewer[/bold white]", style="white"))
     
     while True:
         show_file_tree_options()
@@ -19,20 +21,23 @@ def file_tree_flow():
             clear_screen()
             print_full_project_tree()
             input("\nPress Enter to continue...")
-            print_header("File Tree Viewer")
+            clear_screen()
+            console.print(Panel.fit("[bold white]File Tree Viewer[/bold white]", style="white"))
         elif choice == "2":
             clear_screen()
             print_directory_tree(Path.cwd(), max_depth=3)
             input("\nPress Enter to continue...")
-            print_header("File Tree Viewer")
+            clear_screen()
+            console.print(Panel.fit("[bold white]File Tree Viewer[/bold white]", style="white"))
         elif choice == "3":
-            path_input = input("Enter directory path (or press Enter for current directory): ").strip()
+            path_input = input("\nEnter directory path (or press Enter for current directory): ").strip()
             clear_screen()
             if path_input:
                 print_directory_tree(Path(path_input), max_depth=3)
             else:
                 print_directory_tree(Path.cwd(), max_depth=3)
             input("\nPress Enter to continue...")
-            print_header("File Tree Viewer")
+            clear_screen()
+            console.print(Panel.fit("[bold white]File Tree Viewer[/bold white]", style="white"))
         else:
             print_error("Invalid option")

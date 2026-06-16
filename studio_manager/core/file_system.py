@@ -1,8 +1,9 @@
 import logging
 from pathlib import Path
 from rich.tree import Tree
-from ..cli.display import console, print_success, print_error
-from ..utils.helpers import sanitize_filename, format_file_size
+from rich.panel import Panel
+from ..cli.display import console, print_success, print_error, print_header
+from ..utils.helpers import sanitize_filename, format_file_size, list_all_projects
 from ..utils.constants import PROJECT_SUBFOLDERS, SUBFOLDER_PURPOSES
 
 logging.basicConfig(level=logging.INFO)
@@ -83,7 +84,7 @@ def print_full_project_tree():
         print_error("No projects found. Create a project first.")
         return
     
-    print_header("Project Directory Structure")
+    console.print(Panel.fit("[bold white]Project Directory Structure[/bold white]", style="white"))
     
     root = Tree(f"[bold white]{artists_path.name}[/bold white] [dim](Projects Root)[/dim]")
     
