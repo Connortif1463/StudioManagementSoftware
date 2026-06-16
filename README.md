@@ -17,12 +17,6 @@ pip install -r requirements.txt
 python3 run.py
 ```
 
-### Dependencies
-
-```pip install
-rich>=13.0.0
-```
-
 ### Starting the Application
 
 ```bash
