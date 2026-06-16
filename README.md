@@ -13,8 +13,6 @@ git clone https://github.com/yourusername/StudioManagementSoftware.git
 cd StudioManagementSoftware
 
 pip install -r requirements.txt
-
-python3 run.py
 ```
 
 ### Starting the Application
