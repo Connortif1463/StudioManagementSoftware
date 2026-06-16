@@ -5,6 +5,7 @@ from typing import List, Optional
 from rich.panel import Panel
 
 from .cli.display import clear_screen, console, print_success, print_error, print_warning, print_info, print_dim, print_separator, show_recent_projects_table, show_statistics_table
+from .cli.display import console, print_menu, clear_screen
 from .cli.menu import show_main_menu, show_file_tree_options
 from .cli.prompts import get_choice, get_confirmation, get_text_input
 from .core.project_manager import create_project
@@ -35,6 +36,36 @@ class Completer:
             return matches[state]
         except IndexError:
             return None
+        
+def show_main_menu():
+    """Display the main menu with clear descriptions"""
+    clear_screen()
+    menu_text = """
+[bold white]Main Menu[/bold white]
+
+[cyan]1[/cyan] - Create New Project
+    Create a new song or album project with session templates
+
+[cyan]2[/cyan] - Open Recent Projects/Tasks
+    View statistics, session memos, finished projects, and search
+
+[cyan]3[/cyan] - Project Browser
+    Browse and search all active/finished projects
+
+[cyan]4[/cyan] - Album Management
+    Organize songs into albums and manage track order
+
+[cyan]5[/cyan] - File Tree Viewer
+    Visualize the file directory structure and project organization
+
+[cyan]6[/cyan] - Backup System
+    Create and manage project backups
+
+[cyan]q[/cyan] - Quit
+    Exit the application
+
+"""
+    print_menu(menu_text, title="Studio Management System")
 
 def setup_tab_completion(field: str, history_obj: ProjectHistory):
     """Setup tab completion for a specific field"""
@@ -568,15 +599,22 @@ def show_song_project_details(selected: dict):
     elif action == "4":
         backup_project_flow(project_path)
     elif action == "5":
-        release_date = input("Enter expected release date (YYYY-MM-DD): ").strip()
-        if release_date:
-            tracker.set_release_date(release_date)
-            input("\nPress Enter to continue...")
+        while True:
+            release_date = input("Enter expected release date (YYYY-MM-DD) or press Enter to cancel: ").strip()
+            if not release_date:
+                break
+            if tracker.set_release_date(release_date):
+                print_success(f"Release date set for {selected['project']}")
+                break
+            else:
+                print_error("Invalid date format. Please use YYYY-MM-DD")
+                continue
+        input("\nPress Enter to continue...")
 
-def open_project_flow():
-    """Handle opening existing projects - only show active projects"""
+def project_browser_flow():
+    """Project Browser - browse and search all projects"""
     clear_screen()
-    console.print(Panel.fit("[bold white]Browse Projects[/bold white]", style="white"))
+    console.print(Panel.fit("[bold white]Project Browser[/bold white]", style="white"))
     
     projects = list_all_projects()
     
@@ -592,15 +630,12 @@ def open_project_flow():
     for project in projects:
         is_album = (project["path"] / ".album.json").exists()
         if is_album:
-            # Albums always go to active
             active_projects.append((project, "Album", "N/A"))
         else:
-            # Check stage for songs
             tracker = ProjectTracker(project["path"])
             stage = tracker.get_current_stage()
             if stage == "finished":
-                # Get completion date for sorting
-                completed_date = "9999-99-99"  # Default for sorting
+                completed_date = "9999-99-99"
                 for stage_entry in tracker.data.get("stage_history", []):
                     if stage_entry.get("stage") == "finished":
                         completed_date = stage_entry.get("started", "9999-99-99")[:10]
@@ -638,173 +673,70 @@ def open_project_flow():
     if finished_projects:
         print_separator()
         console.print(f"[dim]Note: {len(finished_projects)} finished project(s) not shown.[/dim]")
-        console.print("[dim]To view or reopen finished projects, go to Tasks menu → View finished projects[/dim]")
-        print_separator()
-        console.print("[bold]Options:[/bold]")
-        console.print("  [cyan]1[/cyan] - Select a project to open")
-        console.print("  [cyan]2[/cyan] - Show all projects (including finished)")
-        console.print("  [cyan]b[/cyan] - Go back")
-        
-        sub_choice = input("\nSelect option: ").strip().lower()
-        
-        if sub_choice == 'b':
-            return
-        elif sub_choice == "2":
-            # Sort finished projects by completion date (newest first)
-            finished_projects.sort(key=lambda x: x[3], reverse=True)
-            
-            from rich.table import Table
-            table = Table(title="All Projects (Finished at bottom)", style="white")
-            table.add_column("#", style="cyan", width=4)
-            table.add_column("Project Name", style="green")
-            table.add_column("Artist", style="yellow")
-            table.add_column("Type", style="blue")
-            table.add_column("Stage", style="magenta")
-            table.add_column("Completed", style="dim")
-            table.add_column("Path", style="dim")
-            
-            # Show active projects first
-            for idx, (project, ptype, stage) in enumerate(active_projects, 1):
-                table.add_row(
-                    str(idx),
-                    project["project"],
-                    project["artist"],
-                    ptype,
-                    stage,
-                    "—",
-                    str(project["path"])
-                )
-            
-            # Then finished projects
-            for idx, (project, ptype, stage, completed_date) in enumerate(finished_projects, len(active_projects) + 1):
-                table.add_row(
-                    str(idx),
-                    f"[dim]{project['project']}[/dim]",
-                    f"[dim]{project['artist']}[/dim]",
-                    f"[dim]{ptype}[/dim]",
-                    f"[dim]{stage}[/dim]",
-                    f"[dim]{completed_date[:10]}[/dim]",
-                    f"[dim]{project['path']}[/dim]"
-                )
-            
-            console.print(table)
-            console.print("[dim]Finished projects shown in dim text. To modify, reopen from Tasks menu.[/dim]")
-            
+        console.print("[dim]To view or reopen finished projects, go to Open Recent Projects/Tasks menu → View finished projects[/dim]")
+    
+    # Search functionality
+    print_separator()
+    console.print("[bold]Options:[/bold]")
+    console.print("  [cyan]s[/cyan] - Search projects")
+    console.print("  [cyan]a[/cyan] - Select project to open")
+    console.print("  [cyan]b[/cyan] - Go back")
+    
+    sub_choice = input("\nSelect option: ").strip().lower()
+    
+    if sub_choice == 'b':
+        return
+    elif sub_choice == 's':
+        search_projects_flow()
+        return
+    elif sub_choice == 'a':
+        if active_projects:
             while True:
-                choice = input("\nEnter project number (or 'b' to go back): ").strip()
-                
+                choice = input("\nEnter project number to open (or 'b' to go back): ").strip()
                 if choice.lower() in ['b', 'back', 'backtrack']:
                     return
-                
                 if choice.isdigit():
                     idx = int(choice) - 1
-                    if idx < len(active_projects):
+                    if 0 <= idx < len(active_projects):
                         project, ptype, stage = active_projects[idx]
-                        show_song_project_details(project)
-                        return
-                    elif idx < len(active_projects) + len(finished_projects):
-                        finished_idx = idx - len(active_projects)
-                        project, ptype, stage, completed_date = finished_projects[finished_idx]
-                        # Show read-only view for finished projects
-                        clear_screen()
-                        console.print(Panel.fit("[bold white]Finished Project (Read Only)[/bold white]", style="white"))
-                        console.print(f"\n  Project: [green]{project['project']}[/green]")
-                        console.print(f"  Artist: [green]{project['artist']}[/green]")
-                        console.print(f"  Stage: [cyan]{stage}[/cyan]")
-                        console.print(f"  Completed: [dim]{completed_date[:10]}[/dim]")
-                        console.print(f"  Path: [dim]{project['path']}[/dim]")
-                        console.print("\n[yellow]This project is marked as finished.[/yellow]")
-                        console.print("To modify, go to Tasks menu → View finished projects → Reopen.")
-                        input("\nPress Enter to continue...")
+                        if ptype == "Album":
+                            show_album_contents(project["path"])
+                        else:
+                            show_song_project_details(project)
                         return
                     else:
                         print_error("Invalid project number")
                 else:
                     print_error("Please enter a valid number")
-            return
-        elif sub_choice == "1":
-            # Continue to project selection
-            pass
         else:
-            print_error("Invalid option")
+            print_warning("No active projects to open")
             input("\nPress Enter to continue...")
-            return
-    
-    # If no finished projects or user chose option 1, allow selection from active
-    if active_projects:
-        while True:
-            choice = input("\nEnter project number (or 'b' to go back): ").strip()
-            
-            if choice.lower() in ['b', 'back', 'backtrack']:
-                return
-            
-            if choice.isdigit():
-                idx = int(choice) - 1
-                if 0 <= idx < len(active_projects):
-                    project, ptype, stage = active_projects[idx]
-                    show_song_project_details(project)
-                    return
-                else:
-                    print_error("Invalid project number")
-            else:
-                print_error("Please enter a valid number")
     else:
-        print_warning("No active projects available")
-        input("\nPress Enter to continue...")
-        return
-
-def show_file_tree_flow():
-    """Handle file tree display"""
-    from .core.file_system import print_directory_tree, print_full_project_tree
-    
-    clear_screen()
-    console.print(Panel.fit("[bold white]File Tree Viewer[/bold white]", style="white"))
-    
-    while True:
-        show_file_tree_options()
-        
-        choice = input("\nSelect an option: ").strip()
-        
-        if choice.lower() in ['b', 'back', 'backtrack']:
-            return
-        elif choice == "1":
-            clear_screen()
-            print_full_project_tree()
-            input("\nPress Enter to continue...")
-            clear_screen()
-            console.print(Panel.fit("[bold white]File Tree Viewer[/bold white]", style="white"))
-        elif choice == "2":
-            clear_screen()
-            print_directory_tree(Path.cwd(), max_depth=3)
-            input("\nPress Enter to continue...")
-            clear_screen()
-            console.print(Panel.fit("[bold white]File Tree Viewer[/bold white]", style="white"))
-        elif choice == "3":
-            path_input = input("\nEnter directory path (or press Enter for current directory): ").strip()
-            clear_screen()
-            if path_input:
-                print_directory_tree(Path(path_input), max_depth=3)
-            else:
-                print_directory_tree(Path.cwd(), max_depth=3)
-            input("\nPress Enter to continue...")
-            clear_screen()
-            console.print(Panel.fit("[bold white]File Tree Viewer[/bold white]", style="white"))
-        else:
-            print_error("Invalid option")
+        print_error("Invalid option")
 
 def view_project_memos_flow():
-    """Flow for viewing memos from a project"""
+    """Flow for viewing memos from a project - excludes finished projects"""
     projects = list_all_projects()
     
     if not projects:
         print_warning("No projects found")
         return
     
-    # Show only song projects (not albums)
-    song_projects = [p for p in projects if not (p["path"] / ".album.json").exists()]
+    # Show only active song projects (not albums, not finished)
+    active_songs = []
+    for project in projects:
+        # Skip albums
+        if (project["path"] / ".album.json").exists():
+            continue
+        
+        tracker = ProjectTracker(project["path"])
+        stage = tracker.get_current_stage()
+        # Only include active projects (not finished)
+        if stage != "finished":
+            active_songs.append((project, stage))
     
-    if not song_projects:
-        print_warning("No song projects found")
+    if not active_songs:
+        print_warning("No active song projects with session memos found")
         return
     
     from rich.table import Table
@@ -814,9 +746,7 @@ def view_project_memos_flow():
     table.add_column("Artist", style="yellow")
     table.add_column("Stage", style="magenta")
     
-    for idx, project in enumerate(song_projects[:15], 1):
-        tracker = ProjectTracker(project["path"])
-        stage = tracker.get_current_stage()
+    for idx, (project, stage) in enumerate(active_songs, 1):
         table.add_row(str(idx), project["project"], project["artist"], stage)
     
     console.print(table)
@@ -824,8 +754,9 @@ def view_project_memos_flow():
     proj_choice = input("\nSelect project number (or 'b' to go back): ").strip()
     if proj_choice.lower() != 'b' and proj_choice.isdigit():
         idx = int(proj_choice) - 1
-        if 0 <= idx < len(song_projects[:15]):
-            project_path = song_projects[idx]["path"]
+        if 0 <= idx < len(active_songs):
+            project, stage = active_songs[idx]
+            project_path = project["path"]
             memo = SessionMemo(project_path)
             
             view_choice = input("\nInteractive navigation? (y/n, default y): ").strip().lower()
@@ -835,7 +766,7 @@ def view_project_memos_flow():
                 memo.view_memos(interactive=True)
 
 def set_release_date_flow():
-    """Flow for setting expected release date on a project"""
+    """Flow for setting expected release date on a project - excludes finished projects"""
     projects = list_all_projects()
     
     if not projects:
@@ -846,7 +777,7 @@ def set_release_date_flow():
     active_songs = []
     for p in projects:
         if (p["path"] / ".album.json").exists():
-            continue  # Skip albums
+            continue
         tracker = ProjectTracker(p["path"])
         stage = tracker.get_current_stage()
         if stage != "finished":
@@ -864,7 +795,7 @@ def set_release_date_flow():
     table.add_column("Stage", style="magenta")
     table.add_column("Current Release", style="dim")
     
-    for idx, (project, tracker) in enumerate(active_songs[:15], 1):
+    for idx, (project, tracker) in enumerate(active_songs, 1):
         current = tracker.data.get("release_date", "Not set")
         if current:
             current = current[:10]
@@ -875,12 +806,18 @@ def set_release_date_flow():
     proj_choice = input("\nSelect project number (or 'b' to go back): ").strip()
     if proj_choice.lower() != 'b' and proj_choice.isdigit():
         idx = int(proj_choice) - 1
-        if 0 <= idx < len(active_songs[:15]):
+        if 0 <= idx < len(active_songs):
             project, tracker = active_songs[idx]
-            release_date = input("Enter expected release date (YYYY-MM-DD) or press Enter to skip: ").strip()
-            if release_date:
-                tracker.set_release_date(release_date)
-                print_success(f"Release date set for {project['project']}")
+            while True:
+                release_date = input("Enter expected release date (YYYY-MM-DD) or press Enter to cancel: ").strip()
+                if not release_date:
+                    break
+                if tracker.set_release_date(release_date):
+                    print_success(f"Release date set for {project['project']}")
+                    break
+                else:
+                    print_error("Invalid date format. Please use YYYY-MM-DD")
+                    continue
 
 def view_finished_projects_flow():
     """View all finished projects"""
@@ -916,9 +853,9 @@ def view_finished_projects_flow():
         project_path = get_project_path(project["artist"], project["name"])
         tracker = ProjectTracker(project_path)
         completed_date = "Unknown"
-        for stage in tracker.data.get("stage_history", []):
-            if stage.get("stage") == "finished":
-                completed_date = stage.get("started", "Unknown")[:16]
+        for stage_entry in tracker.data.get("stage_history", []):
+            if stage_entry.get("stage") == "finished":
+                completed_date = stage_entry.get("started", "Unknown")[:16]
                 break
         
         table.add_row(
@@ -942,10 +879,9 @@ def view_finished_projects_flow():
                 if get_confirmation(f"Move '{project['name']}' back to mastering?"):
                     tracker.update_stage("mastering", "Reopened from finished")
                     print_success(f"Project '{project['name']}' moved back to mastering")
-                    # Refresh the view
                     view_finished_projects_flow()
                     return
-                
+
 def search_projects_flow():
     """Search for projects by name, artist, or stage"""
     clear_screen()
@@ -975,11 +911,11 @@ def search_projects_flow():
         return
     
     # Get all projects
-    all_projects = history.get_recent_projects(limit=200)
+    all_projects = list_all_projects()
     results = []
     
     for project in all_projects:
-        if project.get("type") != "S":
+        if (project["path"] / ".album.json").exists():
             continue
         
         project_path = get_project_path(project["artist"], project["name"])
@@ -1034,42 +970,43 @@ def search_projects_flow():
                     "path": project_path
                 })
 
-def show_tasks():
-    """Show current tasks and statistics - separate songs from albums, filter finished"""
+def tasks_and_projects_flow():
+    """Tasks and Projects - view statistics, memos, finished projects, search"""
     clear_screen()
-    console.print(Panel.fit("[bold white]Current Tasks & Statistics[/bold white]", style="white"))
+    console.print(Panel.fit("[bold white]Tasks & Projects[/bold white]", style="white"))
     
-    # Get all projects
-    all_projects = history.get_recent_projects(limit=50)
+    # Use list_all_projects() instead of history.get_recent_projects()
+    # This ensures all projects from the filesystem are shown
+    projects = list_all_projects()
     
     # Separate songs from albums, and filter out finished
     active_songs = []
     finished_songs = []
     albums = []
     
-    for project in all_projects:
-        if project.get("type") == "S":
-            # Check stage from project tracker
-            project_path = get_project_path(project["artist"], project["name"])
-            tracker = ProjectTracker(project_path)
+    for project in projects:
+        # Check if it's an album
+        is_album = (project["path"] / ".album.json").exists()
+        if is_album:
+            albums.append(project)
+        else:
+            # It's a song project
+            tracker = ProjectTracker(project["path"])
             stage = tracker.get_current_stage()
             project["stage"] = stage
             
             if stage == "finished":
                 finished_songs.append(project)
             else:
-                # Calculate priority for sorting
                 tracker.calculate_priority()
                 project["priority"] = tracker.data.get("priority_score", 0)
                 project["release_date"] = tracker.data.get("release_date")
                 active_songs.append(project)
-        else:
-            albums.append(project)
     
     # Sort active songs by priority (higher first)
     active_songs.sort(key=lambda x: x.get("priority", 0), reverse=True)
     
-    # Show Active Songs (not finished)
+    # Show Active Songs
     if active_songs:
         from rich.table import Table
         table = Table(title="Active Songs", style="white")
@@ -1082,6 +1019,19 @@ def show_tasks():
         table.add_column("Release", style="dim", width=12)
         
         for idx, project in enumerate(active_songs, 1):
+            # Get creation date from project path if not in history
+            created_pretty = project.get("date_created_pretty", "Unknown")
+            if created_pretty == "Unknown":
+                # Try to get from tracker or use folder modified time
+                tracker = ProjectTracker(project["path"])
+                if tracker.data.get("stage_history"):
+                    created_pretty = tracker.data["stage_history"][0].get("started", "Unknown")[:16]
+                else:
+                    # Fall back to folder modification time
+                    import time
+                    mod_time = project["path"].stat().st_ctime
+                    created_pretty = time.strftime("%Y-%m-%d %H:%M", time.localtime(mod_time))
+            
             priority_display = "★" * min(project.get("priority", 0), 4) if project.get("priority", 0) > 0 else "•"
             priority_display = priority_display.center(6)
             release = project.get("release_date", "TBD")
@@ -1092,9 +1042,9 @@ def show_tasks():
             table.add_row(
                 str(idx),
                 priority_display,
-                project.get("date_created_pretty", "Unknown")[:16],
-                project.get("name", "Unknown"),
-                project.get("artist", "Unknown"),
+                created_pretty[:16],
+                project["project"],
+                project["artist"],
                 project.get("stage", "production"),
                 release
             )
@@ -1113,11 +1063,24 @@ def show_tasks():
         table.add_column("Artist", style="yellow")
         
         for idx, project in enumerate(albums, 1):
+            # Get creation date from album.json or folder
+            created_pretty = "Unknown"
+            album_file = project["path"] / ".album.json"
+            if album_file.exists():
+                import json
+                with open(album_file, 'r') as f:
+                    album_data = json.load(f)
+                    created_pretty = album_data.get("created", "Unknown")[:16]
+            else:
+                import time
+                mod_time = project["path"].stat().st_ctime
+                created_pretty = time.strftime("%Y-%m-%d %H:%M", time.localtime(mod_time))
+            
             table.add_row(
                 str(idx),
-                project.get("date_created_pretty", "Unknown")[:16],
-                project.get("name", "Unknown"),
-                project.get("artist", "Unknown")
+                created_pretty,
+                project["project"],
+                project["artist"]
             )
         
         console.print(table)
@@ -1129,7 +1092,7 @@ def show_tasks():
     
     # Numeric menu for additional options
     print_separator()
-    console.print("[bold]Additional Options:[/bold]")
+    console.print("[bold]Options:[/bold]")
     console.print("  [cyan]1[/cyan] - View session memos from a project")
     console.print("  [cyan]2[/cyan] - Set expected release date for a project")
     console.print("  [cyan]3[/cyan] - View finished projects")
@@ -1151,10 +1114,49 @@ def show_tasks():
     
     input("\nPress Enter to continue...")
 
+def show_file_tree_flow():
+    """Handle file tree display"""
+    from .core.file_system import print_directory_tree, print_full_project_tree
+    
+    clear_screen()
+    console.print(Panel.fit("[bold white]File Tree Viewer[/bold white]", style="white"))
+    
+    while True:
+        show_file_tree_options()
+        
+        choice = input("\nSelect an option: ").strip()
+        
+        if choice.lower() in ['b', 'back', 'backtrack']:
+            return
+        elif choice == "1":
+            clear_screen()
+            print_full_project_tree()
+            input("\nPress Enter to continue...")
+            clear_screen()
+            console.print(Panel.fit("[bold white]File Tree Viewer[/bold white]", style="white"))
+        elif choice == "2":
+            clear_screen()
+            print_directory_tree(Path.cwd(), max_depth=3)
+            input("\nPress Enter to continue...")
+            clear_screen()
+            console.print(Panel.fit("[bold white]File Tree Viewer[/bold white]", style="white"))
+        elif choice == "3":
+            path_input = input("\nEnter directory path (or press Enter for current directory): ").strip()
+            clear_screen()
+            if path_input:
+                print_directory_tree(Path(path_input), max_depth=3)
+            else:
+                print_directory_tree(Path.cwd(), max_depth=3)
+            input("\nPress Enter to continue...")
+            clear_screen()
+            console.print(Panel.fit("[bold white]File Tree Viewer[/bold white]", style="white"))
+        else:
+            print_error("Invalid option")
+
 def global_backup_flow():
     """Backup all projects"""
     clear_screen()
-    console.print(Panel.fit("[bold white]Global Backup[/bold white]", style="white"))
+    console.print(Panel.fit("[bold white]Backup System[/bold white]", style="white"))
     
     projects = list_all_projects()
     
@@ -1163,17 +1165,34 @@ def global_backup_flow():
         input("\nPress Enter to continue...")
         return
     
-    console.print(f"\n[bold]Found {len(projects)} projects to backup[/bold]")
+    console.print(f"\n[bold]Backup Options:[/bold]")
+    console.print("  [cyan]1[/cyan] - Backup a single project")
+    console.print("  [cyan]2[/cyan] - Backup all projects")
+    console.print("  [cyan]b[/cyan] - Go back")
     
-    if get_confirmation("Create backups for all projects?"):
+    backup_choice = input("\nSelect option: ").strip()
+    
+    if backup_choice == "1":
+        projects = list_all_projects()
+        if projects:
+            print("\n[bold]Select project to backup:[/bold]")
+            for i, p in enumerate(projects[:10], 1):
+                print(f"  {i}. {p['artist']} - {p['project']}")
+            proj_choice = input("\nSelect project: ").strip()
+            if proj_choice.isdigit() and 1 <= int(proj_choice) <= len(projects[:10]):
+                tracker = ProjectTracker(projects[int(proj_choice)-1]["path"])
+                backup_project_flow(projects[int(proj_choice)-1]["path"])
+        else:
+            print_warning("No projects found")
+    elif backup_choice == "2":
         for project in projects:
             print_info(f"\nBacking up {project['artist']} - {project['project']}...")
             tracker = ProjectTracker(project["path"])
             tracker.create_backup()
-        
         print_success(f"\nBackup complete! All {len(projects)} projects backed up.")
-    
-    input("\nPress Enter to continue...")
+        input("\nPress Enter to continue...")
+    elif backup_choice == 'b':
+        return
 
 def main():
     """Main program entry point"""
@@ -1201,34 +1220,15 @@ def main():
             elif objective == "1":
                 new_project_flow()
             elif objective == "2":
-                open_project_flow()
+                tasks_and_projects_flow()
             elif objective == "3":
-                show_file_tree_flow()
+                project_browser_flow()
             elif objective == "4":
-                show_tasks()
-            elif objective == "5":
                 album_management_flow()
+            elif objective == "5":
+                show_file_tree_flow()
             elif objective == "6":
-                console.print("\n[bold]Backup Options:[/bold]")
-                console.print("  1 - Backup a single project")
-                console.print("  2 - Backup all projects")
-                backup_choice = input("\nSelect option: ").strip()
-                if backup_choice == "1":
-                    projects = list_all_projects()
-                    if projects:
-                        print("\n[bold]Select project to backup:[/bold]")
-                        for i, p in enumerate(projects[:10], 1):
-                            print(f"  {i}. {p['artist']} - {p['project']}")
-                        proj_choice = input("\nSelect project: ").strip()
-                        if proj_choice.isdigit() and 1 <= int(proj_choice) <= len(projects[:10]):
-                            tracker = ProjectTracker(projects[int(proj_choice)-1]["path"])
-                            backup_project_flow(projects[int(proj_choice)-1]["path"])
-                    else:
-                        print_warning("No projects found")
-                elif backup_choice == "2":
-                    global_backup_flow()
-                else:
-                    print_warning("Invalid option")
+                global_backup_flow()
             else:
                 print_error("\nInvalid option. Please choose 1, 2, 3, 4, 5, 6, or q")
                 input("\nPress Enter to continue...")
@@ -1244,6 +1244,3 @@ def main():
             session_logger.save_session()
             print_error(f"\nAn unexpected error occurred: {e}")
             input("\nPress Enter to continue...")
-
-if __name__ == "__main__":
-    main()
