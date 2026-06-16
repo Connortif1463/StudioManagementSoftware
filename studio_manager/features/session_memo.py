@@ -3,7 +3,8 @@ import readline
 from pathlib import Path
 from datetime import datetime
 from typing import Dict, List
-from ..cli.display import console, print_header, print_separator, print_success, print_info, print_error, print_warning, print_dim
+from rich.panel import Panel
+from ..cli.display import console, print_header, print_separator, print_success, print_info, print_error, print_warning, print_dim, clear_screen
 from ..cli.prompts import get_text_input, get_choice, get_confirmation
 from ..data.history import ProjectHistory
 
@@ -360,41 +361,388 @@ class SessionMemo:
         
         return memo
     
-    def view_memos(self):
-        """View all session memos"""
+    def view_last_memo(self):
+        """View the most recent session memo without editing"""
+        if not self.memos["sessions"]:
+            print_warning("No session memos found for this project")
+            return None
+        
+        # Get the most recent memo
+        last_memo = self.memos["sessions"][-1]
+        
+        print_header(f"Most Recent Memo - {last_memo['date']} at {last_memo['time']}")
+        
+        # Display memo content
+        console.print("\n[bold]Contributors:[/bold]")
+        for c in last_memo["contributors"]:
+            if "instrument" in c:
+                console.print(f"  - {c['name']} ({c['role']} - {c['instrument']})")
+            else:
+                console.print(f"  - {c['name']} ({c['role']})")
+        
+        if last_memo["tasks_completed"]:
+            console.print("\n[bold]Tasks Completed:[/bold]")
+            for task in last_memo["tasks_completed"]:
+                console.print(f"  - {task}")
+        
+        if last_memo["notes"]:
+            console.print("\n[bold]Notes:[/bold]")
+            note_lines = last_memo["notes"].split('\n')
+            for line in note_lines:
+                console.print(f"  {line}")
+        
+        if last_memo["files_created"]:
+            console.print("\n[bold]Files Created/Modified:[/bold]")
+            for f in last_memo["files_created"]:
+                console.print(f"  - {f['name']} ({f['type']})")
+        
+        if last_memo.get("last_edited"):
+            console.print(f"\n[dim]Last edited: {last_memo['last_edited_pretty']}[/dim]")
+        
+        return last_memo
+    
+    def edit_last_memo(self):
+        """Edit the most recent session memo"""
+        if not self.memos["sessions"]:
+            print_warning("No session memos found to edit")
+            return None
+        
+        # Get the most recent memo
+        last_memo = self.memos["sessions"][-1]
+        
+        print_header(f"Editing Memo from {last_memo['date']} at {last_memo['time']}")
+        
+        console.print("\n[bold cyan]Current Content:[/bold cyan]")
+        console.print(f"  Contributors: {', '.join([c['name'] for c in last_memo['contributors']])}")
+        console.print(f"  Tasks: {len(last_memo['tasks_completed'])} tasks")
+        if last_memo['notes']:
+            console.print(f"  Notes: {last_memo['notes']}")
+        
+        print_separator()
+        
+        if not get_confirmation("\nWould you like to add to this memo?"):
+            return None
+        
+        # Add new tasks
+        console.print("\n[bold]Add new tasks completed:[/bold]")
+        print_info("Enter tasks one by one. Press Enter with no text to finish.")
+        while True:
+            task = input("\nTask completed: ").strip()
+            if not task:
+                break
+            last_memo["tasks_completed"].append(task)
+            print_success(f"Added task: {task}")
+        
+        # Add to notes
+        additional_notes = input("\nAdd to notes (or press Enter to skip): ").strip()
+        if additional_notes:
+            if last_memo["notes"]:
+                last_memo["notes"] += f"\n{additional_notes}"
+            else:
+                last_memo["notes"] = additional_notes
+            print_success("Notes updated")
+        
+        # Add new files
+        console.print("\n[bold]Add new files created/modified:[/bold]")
+        print_info("Enter file names one by one. Press Enter with no name to finish.")
+        
+        file_type_options = ["Session", "Audio", "MIDI", "Export", "Other"]
+        
+        while True:
+            file_name = input("\nFile name: ").strip()
+            if not file_name:
+                break
+            
+            print_info(f"Available types: {', '.join(file_type_options)}")
+            
+            while True:
+                file_type = input(f"File type for {file_name}: ").strip().lower()
+                
+                matched_type = None
+                for ft in file_type_options:
+                    if ft.lower() == file_type:
+                        matched_type = ft
+                        break
+                
+                if matched_type:
+                    if matched_type == "Other":
+                        custom_type = input("Specify file type: ").strip()
+                        last_memo["files_created"].append({"name": file_name, "type": custom_type})
+                    else:
+                        last_memo["files_created"].append({"name": file_name, "type": matched_type})
+                    print_success(f"Added file: {file_name} ({matched_type})")
+                    break
+                
+                print_error(f"'{file_type}' is not a valid type")
+                print_info(f"Please choose from: {', '.join(file_type_options)}")
+        
+        # Update timestamp to show when edited
+        last_memo["last_edited"] = datetime.now().isoformat()
+        last_memo["last_edited_pretty"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        
+        self.save_memos()
+        print_success("\nMemo updated successfully!")
+        
+        # Show updated summary
+        console.print("\n[bold]Updated Session Summary:[/bold]")
+        console.print(f"  Contributors: [green]{', '.join([c['name'] for c in last_memo['contributors']])}[/green]")
+        console.print(f"  Tasks: [green]{len(last_memo['tasks_completed'])} completed[/green]")
+        
+        return last_memo
+    
+    def edit_existing_memo(self, memo):
+        """Edit an existing memo (not just the last one)"""
+        print_header(f"Editing Memo from {memo['date']} at {memo['time']}")
+        
+        console.print("\n[bold cyan]Current Content:[/bold cyan]")
+        console.print(f"  Contributors: {', '.join([c['name'] for c in memo['contributors']])}")
+        console.print(f"  Tasks: {len(memo['tasks_completed'])} tasks")
+        if memo['notes']:
+            console.print(f"  Notes: {memo['notes']}")
+        
+        print_separator()
+        
+        if not get_confirmation("\nWould you like to add to this memo?"):
+            return None
+        
+        # Add new tasks
+        console.print("\n[bold]Add new tasks completed:[/bold]")
+        print_info("Enter tasks one by one. Press Enter with no text to finish.")
+        while True:
+            task = input("\nTask completed: ").strip()
+            if not task:
+                break
+            memo["tasks_completed"].append(task)
+            print_success(f"Added task: {task}")
+        
+        # Add to notes
+        additional_notes = input("\nAdd to notes (or press Enter to skip): ").strip()
+        if additional_notes:
+            if memo["notes"]:
+                memo["notes"] += f"\n{additional_notes}"
+            else:
+                memo["notes"] = additional_notes
+            print_success("Notes updated")
+        
+        # Add new files
+        console.print("\n[bold]Add new files created/modified:[/bold]")
+        print_info("Enter file names one by one. Press Enter with no name to finish.")
+        
+        file_type_options = ["Session", "Audio", "MIDI", "Export", "Other"]
+        
+        while True:
+            file_name = input("\nFile name: ").strip()
+            if not file_name:
+                break
+            
+            print_info(f"Available types: {', '.join(file_type_options)}")
+            
+            while True:
+                file_type = input(f"File type for {file_name}: ").strip().lower()
+                
+                matched_type = None
+                for ft in file_type_options:
+                    if ft.lower() == file_type:
+                        matched_type = ft
+                        break
+                
+                if matched_type:
+                    if matched_type == "Other":
+                        custom_type = input("Specify file type: ").strip()
+                        memo["files_created"].append({"name": file_name, "type": custom_type})
+                    else:
+                        memo["files_created"].append({"name": file_name, "type": matched_type})
+                    print_success(f"Added file: {file_name} ({matched_type})")
+                    break
+                
+                print_error(f"'{file_type}' is not a valid type")
+                print_info(f"Please choose from: {', '.join(file_type_options)}")
+        
+        # Update timestamp to show when edited
+        memo["last_edited"] = datetime.now().isoformat()
+        memo["last_edited_pretty"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        
+        self.save_memos()
+        print_success("\nMemo updated successfully!")
+        
+        # Show updated summary
+        console.print("\n[bold]Updated Session Summary:[/bold]")
+        console.print(f"  Contributors: [green]{', '.join([c['name'] for c in memo['contributors']])}[/green]")
+        console.print(f"  Tasks: [green]{len(memo['tasks_completed'])} completed[/green]")
+        
+        return memo
+    
+    def view_memos_interactive(self):
+        """View session memos with interactive navigation (most recent first)"""
         if not self.memos["sessions"]:
             print_dim("No session memos found for this project")
             return
         
-        print_header("Session History")
+        # Reverse to show most recent first
+        sessions = list(reversed(self.memos["sessions"]))
+        total = len(sessions)
+        current_idx = 0
         
-        for idx, memo in enumerate(reversed(self.memos["sessions"]), 1):
-            console.print(f"\n[bold cyan]Session #{idx}[/bold cyan] - [yellow]{memo['date']} at {memo['time']}[/yellow]")
-            console.print("  [bold]Contributors:[/bold]")
+        while True:
+            clear_screen()
+            memo = sessions[current_idx]
+            
+            # Header with navigation info
+            console.print(Panel.fit(
+                f"[bold white]Session Memo {current_idx + 1} of {total}[/bold white]", 
+                style="white"
+            ))
+            
+            # Display memo content
+            console.print(f"\n[bold cyan]Date:[/bold cyan] [yellow]{memo['date']} at {memo['time']}[/yellow]")
+            
+            # Contributors
+            console.print("\n[bold]Contributors:[/bold]")
             for c in memo["contributors"]:
                 if "instrument" in c:
-                    console.print(f"    - {c['name']} ({c['role']} - {c['instrument']})")
+                    console.print(f"  - {c['name']} ({c['role']} - {c['instrument']})")
                 else:
-                    console.print(f"    - {c['name']} ({c['role']})")
-            console.print("  [bold]Tasks:[/bold]")
-            for task in memo["tasks_completed"]:
-                console.print(f"    - {task}")
+                    console.print(f"  - {c['name']} ({c['role']})")
+            
+            # Tasks
+            if memo["tasks_completed"]:
+                console.print("\n[bold]Tasks Completed:[/bold]")
+                for task in memo["tasks_completed"]:
+                    console.print(f"  - {task}")
+            
+            # Notes - with proper indentation for multi-line
             if memo["notes"]:
-                console.print(f"  [bold]Notes:[/bold] {memo['notes']}")
+                console.print("\n[bold]Notes:[/bold]")
+                note_lines = memo["notes"].split('\n')
+                for line in note_lines:
+                    console.print(f"  {line}")
+            
+            # Files
             if memo["files_created"]:
-                console.print("  [bold]Files:[/bold]")
+                console.print("\n[bold]Files Created/Modified:[/bold]")
                 for f in memo["files_created"]:
-                    console.print(f"    - {f['name']} ({f['type']})")
-            if idx < len(self.memos["sessions"]):
-                print_separator("-", 50)
+                    console.print(f"  - {f['name']} ({f['type']})")
+            
+            # Navigation controls
+            print_separator()
+            console.print("\n[bold]Navigation:[/bold]")
+            
+            nav_options = []
+            if current_idx > 0:
+                nav_options.append("[cyan]p[/cyan] - Previous")
+            if current_idx < total - 1:
+                nav_options.append("[cyan]n[/cyan] - Next")
+            nav_options.append("[cyan]f[/cyan] - First")
+            nav_options.append("[cyan]l[/cyan] - Last")
+            nav_options.append("[cyan]e[/cyan] - Edit this memo")
+            nav_options.append("[cyan]q[/cyan] - Quit")
+            
+            console.print("  ".join(nav_options))
+            
+            choice = input("\nChoice: ").strip().lower()
+            
+            if choice == 'q':
+                break
+            elif choice == 'p' and current_idx > 0:
+                current_idx -= 1
+            elif choice == 'n' and current_idx < total - 1:
+                current_idx += 1
+            elif choice == 'f':
+                current_idx = 0
+            elif choice == 'l':
+                current_idx = total - 1
+            elif choice == 'e':
+                # Edit the current memo
+                self.edit_existing_memo(memo)
+                # Reload memos after editing
+                self.memos = self.load_memos()
+                sessions = list(reversed(self.memos["sessions"]))
+                total = len(sessions)
+                # Keep at same index or adjust if needed
+                if current_idx >= total:
+                    current_idx = total - 1
+            else:
+                if choice:
+                    print_error("Invalid choice")
+                    input("\nPress Enter to continue...")
+        
+        clear_screen()
 
-def prompt_for_session_memo(project_path: Path, history_obj: ProjectHistory = None):
-    """Prompt user for session memo - only called once when DAW session ends"""
+    def view_memos(self, interactive: bool = True):
+        """View all session memos - interactive mode by default"""
+        if interactive:
+            self.view_memos_interactive()
+        else:
+            # Original non-interactive view
+            if not self.memos["sessions"]:
+                print_dim("No session memos found for this project")
+                return
+            
+            print_header("Session History")
+            
+            for idx, memo in enumerate(reversed(self.memos["sessions"]), 1):
+                console.print(f"\n[bold cyan]Session #{idx}[/bold cyan] - [yellow]{memo['date']} at {memo['time']}[/yellow]")
+                console.print("  [bold]Contributors:[/bold]")
+                for c in memo["contributors"]:
+                    if "instrument" in c:
+                        console.print(f"    - {c['name']} ({c['role']} - {c['instrument']})")
+                    else:
+                        console.print(f"    - {c['name']} ({c['role']})")
+                console.print("  [bold]Tasks:[/bold]")
+                for task in memo["tasks_completed"]:
+                    console.print(f"    - {task}")
+                if memo["notes"]:
+                    console.print("  [bold]Notes:[/bold]")
+                    note_lines = memo["notes"].split('\n')
+                    for line in note_lines:
+                        console.print(f"    {line}")
+                if memo["files_created"]:
+                    console.print("  [bold]Files:[/bold]")
+                    for f in memo["files_created"]:
+                        console.print(f"    - {f['name']} ({f['type']})")
+                if idx < len(self.memos["sessions"]):
+                    print_separator("-", 50)
+
+def prompt_for_session_memo(project_path: Path, history_obj: ProjectHistory = None, is_manual: bool = False):
+    """
+    Prompt user for session memo.
+    - If called after DAW session (is_manual=False): create new memo
+    - If called manually from menu (is_manual=True): ONLY view/edit existing memos, no new creation
+    """
     global _history
     _history = history_obj
     
-    print_separator()
-    if get_confirmation("\nRecord session notes and contributor information?"):
-        memo = SessionMemo(project_path)
-        return memo.create_memo()
-    return None
+    memo = SessionMemo(project_path)
+    
+    if is_manual:
+        # Manual view from menu - ONLY view/edit existing memos
+        print_separator()
+        
+        if not memo.memos["sessions"]:
+            print_warning("No session memos found for this project")
+            return None
+        
+        # Show the last memo
+        memo.view_last_memo()
+        
+        print_separator()
+        console.print("\n[bold]Options:[/bold]")
+        console.print("  [cyan]1[/cyan] - Add to this memo")
+        console.print("  [cyan]2[/cyan] - View all memos")
+        console.print("  [cyan]b[/cyan] - Go back")
+        
+        choice = input("\nSelect option: ").strip()
+        
+        if choice == "1":
+            return memo.edit_last_memo()
+        elif choice == "2":
+            memo.view_memos(interactive=True)
+            return None
+        else:
+            return None
+    else:
+        # Called after DAW session - create new memo
+        print_separator()
+        if get_confirmation("\nRecord session notes and contributor information?"):
+            return memo.create_memo()
+        return None

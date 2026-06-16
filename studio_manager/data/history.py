@@ -56,7 +56,7 @@ class ProjectHistory:
         with open(self.history_file, 'w') as f:
             json.dump(save_data, f, indent=2)
     
-    def add_project(self, name: str, project_type: str, artist: str, engineers: List[str], daw: str = ""):
+    def add_project(self, name: str, project_type: str, artist: str, engineers: List[str], daw: str = "", release_date: str = None):
         """Add a new project to history"""
         now = datetime.now()
         project_entry = {
@@ -69,7 +69,9 @@ class ProjectHistory:
             "date_created_pretty": now.strftime("%Y-%m-%d %H:%M:%S"),
             "timestamp": now.timestamp(),
             "weekday": now.strftime("%A"),
-            "week_number": now.isocalendar()[1]
+            "week_number": now.isocalendar()[1],
+            "release_date": release_date,
+            "stage": "production"  # Default stage for new projects
         }
         
         self.data["projects"].append(project_entry)

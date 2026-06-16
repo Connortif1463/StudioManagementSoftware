@@ -1,4 +1,5 @@
 import json
+import shutil
 from pathlib import Path
 from datetime import datetime
 from typing import Dict, List, Optional
@@ -38,7 +39,9 @@ class ProjectTracker:
             "album": None,
             "album_position": None,
             "backups": [],
-            "last_modified": datetime.now().isoformat()
+            "last_modified": datetime.now().isoformat(),
+            "release_date": None,
+            "priority_score": 0
         }
     
     def save(self):
@@ -98,11 +101,52 @@ class ProjectTracker:
             summary[file["stage"]].append(file["path"])
         return summary
     
+    def calculate_priority(self) -> int:
+        """Calculate priority score based on stage and release date"""
+        # Stage weights: production=4, mixing=3, mastering=2, finished=0
+        stage_weights = {
+            "production": 4,
+            "mixing": 3,
+            "mastering": 2,
+            "finished": 0
+        }
+        
+        score = stage_weights.get(self.data["current_stage"], 0)
+        
+        # Add release date urgency (closer date = higher priority)
+        if self.data.get("release_date"):
+            try:
+                release = datetime.fromisoformat(self.data["release_date"])
+                days_until = (release - datetime.now()).days
+                if days_until <= 7:
+                    score += 3  # Very urgent
+                elif days_until <= 30:
+                    score += 2  # Urgent
+                elif days_until <= 90:
+                    score += 1  # Normal
+            except:
+                pass
+        
+        self.data["priority_score"] = score
+        self.save()
+        return score
+    
+    def set_release_date(self, release_date: str):
+        """Set expected release date"""
+        try:
+            # Validate date format
+            release = datetime.fromisoformat(release_date)
+            self.data["release_date"] = release_date
+            self.calculate_priority()
+            self.save()
+            print_success(f"Release date set to {release_date}")
+            return True
+        except ValueError:
+            print_error("Invalid date format. Use YYYY-MM-DD")
+            return False
+    
     def create_backup(self, backup_path: Path = None, engineer: str = None) -> bool:
         """Create a backup of the project with metadata"""
-        import shutil
-        from datetime import datetime
-        
         if backup_path is None:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             backup_path = self.project_path.parent / f"{self.project_path.name}_backup_{timestamp}"
@@ -195,6 +239,7 @@ class ProjectTracker:
             table.add_row(str(idx), date, backup["path"], f"{backup['size_mb']:.2f}")
         
         console.print(table)
+
 
 class AlbumManager:
     """Manages albums and song organization"""
