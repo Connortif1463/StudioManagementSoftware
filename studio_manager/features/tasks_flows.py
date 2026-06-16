@@ -7,6 +7,7 @@ from ..cli.prompts import get_confirmation
 from .project_tracker import ProjectTracker
 from .session_memo import SessionMemo
 from ..utils.helpers import get_project_path, list_all_projects
+from .browser_flows import show_song_project_details
 
 def view_project_memos_flow():
     """Flow for viewing memos from a project - excludes finished projects"""
@@ -422,9 +423,9 @@ def tasks_and_projects_flow(history):
     
     print_separator()
     console.print("[bold]Options:[/bold]")
-    console.print("  [cyan]1[/cyan] - View session memos from a project")
-    console.print("  [cyan]2[/cyan] - Set expected release date for a project")
-    console.print("  [cyan]3[/cyan] - View finished projects")
+    console.print("  [cyan]1[/cyan] - Open a project from the list above")
+    console.print("  [cyan]2[/cyan] - View session memos from a project")
+    console.print("  [cyan]3[/cyan] - Set expected release date for a project")
     console.print("  [cyan]4[/cyan] - Search for a project")
     console.print("  [cyan]5[/cyan] - Filter by project category")
     console.print("  [cyan]b[/cyan] - Go back")
@@ -432,11 +433,30 @@ def tasks_and_projects_flow(history):
     choice = input("\nSelect option: ").strip().lower()
     
     if choice == "1":
-        view_project_memos_flow()
+        # Open a project from the active songs list
+        if active_songs:
+            proj_choice = input("\nEnter the number of the project to open: ").strip()
+            if proj_choice.isdigit():
+                idx = int(proj_choice) - 1
+                if 0 <= idx < len(active_songs):
+                    project = active_songs[idx]
+                    from .browser_flows import show_song_project_details
+                    show_song_project_details(project, history)
+                    tasks_and_projects_flow(history)
+                    return
+                else:
+                    print_error("Invalid project number")
+                    input("\nPress Enter to continue...")
+            else:
+                print_error("Please enter a valid number")
+                input("\nPress Enter to continue...")
+        else:
+            print_warning("No active projects to open")
+            input("\nPress Enter to continue...")
     elif choice == "2":
-        set_release_date_flow()
+        view_project_memos_flow()
     elif choice == "3":
-        view_finished_projects_flow()
+        set_release_date_flow()
     elif choice == "4":
         search_projects_flow()
     elif choice == "5":

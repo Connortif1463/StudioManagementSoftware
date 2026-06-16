@@ -4,12 +4,13 @@ from pathlib import Path
 from datetime import datetime
 from typing import Dict, List, Optional
 from rich.table import Table
-from ..cli.display import console, print_header, print_success, print_info, print_warning, print_error
+from ..cli.display import console, print_success, print_info, print_warning, print_error
 
 class ProjectTracker:
     """Tracks project stage, backups, and album organization"""
     
     STAGES = ["production", "mixing", "mastering", "finished"]
+    PROJECT_CATEGORIES = ["studio_session", "live_recording", "demo", "test", "fun"]
     
     def __init__(self, project_path: Path):
         self.project_path = Path(project_path)
@@ -27,6 +28,7 @@ class ProjectTracker:
         """Create default tracking structure"""
         return {
             "project_name": self.project_path.name,
+            "project_category": "studio_session",
             "current_stage": "production",
             "stage_history": [
                 {
@@ -73,37 +75,12 @@ class ProjectTracker:
         print_success(f"Project moved from {old_stage} to {new_stage}")
         return True
     
-    def track_file(self, file_path: Path, file_type: str, stage: str):
-        """Track a file in the project"""
-        rel_path = str(file_path.relative_to(self.project_path))
-        
-        file_entry = {
-            "path": rel_path,
-            "type": file_type,
-            "stage": stage,
-            "created": datetime.now().isoformat(),
-            "size": file_path.stat().st_size if file_path.exists() else 0
-        }
-        
-        # Remove old entry if exists
-        self.data["files"] = [f for f in self.data["files"] if f["path"] != rel_path]
-        self.data["files"].append(file_entry)
-        self.save()
-    
     def get_current_stage(self) -> str:
         """Get current project stage"""
         return self.data["current_stage"]
     
-    def get_stage_summary(self) -> Dict:
-        """Get summary of files by stage"""
-        summary = {stage: [] for stage in self.STAGES}
-        for file in self.data["files"]:
-            summary[file["stage"]].append(file["path"])
-        return summary
-    
     def calculate_priority(self) -> int:
         """Calculate priority score based on stage and release date"""
-        # Stage weights: production=4, mixing=3, mastering=2, finished=0
         stage_weights = {
             "production": 4,
             "mixing": 3,
@@ -113,17 +90,16 @@ class ProjectTracker:
         
         score = stage_weights.get(self.data["current_stage"], 0)
         
-        # Add release date urgency (closer date = higher priority)
         if self.data.get("release_date"):
             try:
                 release = datetime.fromisoformat(self.data["release_date"])
                 days_until = (release - datetime.now()).days
                 if days_until <= 7:
-                    score += 3  # Very urgent
+                    score += 3
                 elif days_until <= 30:
-                    score += 2  # Urgent
+                    score += 2
                 elif days_until <= 90:
-                    score += 1  # Normal
+                    score += 1
             except:
                 pass
         
@@ -134,7 +110,6 @@ class ProjectTracker:
     def set_release_date(self, release_date: str):
         """Set expected release date"""
         try:
-            # Validate date format
             release = datetime.fromisoformat(release_date)
             self.data["release_date"] = release_date
             self.calculate_priority()
@@ -144,6 +119,20 @@ class ProjectTracker:
         except ValueError:
             print_error("Invalid date format. Use YYYY-MM-DD")
             return False
+    
+    def set_project_category(self, category: str):
+        """Set project category"""
+        if category not in self.PROJECT_CATEGORIES:
+            print_error(f"Invalid category. Choose from: {', '.join(self.PROJECT_CATEGORIES)}")
+            return False
+        self.data["project_category"] = category
+        self.save()
+        print_success(f"Project category set to {category.replace('_', ' ').title()}")
+        return True
+    
+    def get_project_category(self) -> str:
+        """Get project category"""
+        return self.data.get("project_category", "studio_session")
     
     def create_backup(self, backup_path: Path = None, engineer: str = None) -> bool:
         """Create a backup of the project with metadata"""
@@ -156,10 +145,8 @@ class ProjectTracker:
             shutil.copytree(self.project_path, backup_path, 
                         ignore=shutil.ignore_patterns('*.pyc', '__pycache__', '.DS_Store', '*.backup'))
             
-            # Calculate size
             total_size = sum(f.stat().st_size for f in backup_path.rglob('*') if f.is_file()) / (1024 * 1024)
             
-            # Create metadata file
             metadata = {
                 "backup_created": datetime.now().isoformat(),
                 "backup_created_pretty": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
@@ -169,20 +156,9 @@ class ProjectTracker:
                 "engineer": engineer or "Unknown",
                 "size_mb": total_size,
                 "files_backed_up": len(list(backup_path.rglob('*'))),
-                "stage_history": self.data["stage_history"][-3:],  # Last 3 stages
-                "most_recent_version": max(
-                    [f.stat().st_mtime for f in self.project_path.rglob('*') if f.is_file()],
-                    default=0
-                )
+                "stage_history": self.data["stage_history"][-3:],
             }
             
-            # Convert timestamp to readable date
-            if metadata["most_recent_version"]:
-                metadata["most_recent_version_pretty"] = datetime.fromtimestamp(
-                    metadata["most_recent_version"]
-                ).strftime("%Y-%m-%d %H:%M:%S")
-            
-            # Write metadata file
             metadata_file = backup_path / "BACKUP_INFO.txt"
             with open(metadata_file, 'w') as f:
                 f.write(f"BACKUP INFORMATION\n")
@@ -193,14 +169,9 @@ class ProjectTracker:
                 f.write(f"Stage at Backup: {metadata['current_stage']}\n")
                 f.write(f"Backup Size: {metadata['size_mb']:.2f} MB\n")
                 f.write(f"Files Backed Up: {metadata['files_backed_up']}\n\n")
-                
-                if metadata.get("most_recent_version_pretty"):
-                    f.write(f"Most Recent Project File: {metadata['most_recent_version_pretty']}\n\n")
-                
                 f.write(f"Stage History:\n")
                 for stage in metadata['stage_history']:
                     f.write(f"  - {stage.get('stage')} (started: {stage.get('started', 'Unknown')[:19]})\n")
-                
                 f.write(f"\nOriginal Project Path: {metadata['original_project_path']}\n")
             
             backup_entry = {
@@ -216,7 +187,6 @@ class ProjectTracker:
             
             print_success(f"Backup created: {backup_path}")
             print_info(f"Size: {total_size:.2f} MB")
-            print_info(f"Backup info saved to: {metadata_file}")
             return True
         except Exception as e:
             print_error(f"Backup failed: {e}")
@@ -276,7 +246,6 @@ class AlbumManager:
             "added": datetime.now().isoformat()
         }
         
-        # Check if already in album
         existing = [s for s in self.data["songs"] if s["path"] == str(song_path)]
         if existing:
             print_warning(f"Song already in album")
@@ -288,7 +257,6 @@ class AlbumManager:
         self.data["songs"].insert(position - 1, song_entry)
         self.data["total_tracks"] = len(self.data["songs"])
         
-        # Update the song's tracker to reference the album
         song_tracker = ProjectTracker(song_path)
         song_tracker.data["album"] = str(self.album_path)
         song_tracker.data["album_position"] = position
@@ -302,13 +270,11 @@ class AlbumManager:
         """Remove a song from the album"""
         self.data["songs"] = [s for s in self.data["songs"] if s["path"] != str(song_path)]
         
-        # Update positions of remaining songs
         for idx, song in enumerate(self.data["songs"], 1):
             song_tracker = ProjectTracker(Path(song["path"]))
             song_tracker.data["album_position"] = idx
             song_tracker.save()
         
-        # Remove album reference from song
         song_tracker = ProjectTracker(song_path)
         song_tracker.data["album"] = None
         song_tracker.data["album_position"] = None
@@ -320,7 +286,6 @@ class AlbumManager:
     
     def reorder_song(self, song_path: Path, new_position: int):
         """Change a song's position in the album"""
-        # Remove and re-insert
         self.remove_song(song_path)
         self.add_song(song_path, new_position)
     
@@ -356,8 +321,7 @@ class AlbumManager:
                     if project_dir.is_dir():
                         tracker = ProjectTracker(project_dir)
                         if tracker.data.get("album") is None and tracker.data.get("project_name"):
-                            # Check if it's a song project (has DAW folders)
-                            if any((project_dir / f).exists() for f in ["ableton", "protools", "logic"]):
+                            if any((project_dir / f).exists() for f in ["production", "mix", "master"]):
                                 unassigned.append(project_dir)
         
         return unassigned

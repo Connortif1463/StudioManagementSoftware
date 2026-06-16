@@ -1,7 +1,8 @@
 from pathlib import Path
 from rich.panel import Panel
-from ..cli.display import console, clear_screen, print_error, print_info
+from ..cli.display import console, clear_screen, print_error
 from ..cli.menu import show_file_tree_options
+from ..features.project_tracker import ProjectTracker
 
 def file_tree_flow():
     """Handle file tree display flow"""
@@ -19,7 +20,7 @@ def file_tree_flow():
             return
         elif choice == "1":
             clear_screen()
-            print_full_project_tree()
+            print_full_project_tree()  # This will show colored current stage
             input("\nPress Enter to continue...")
             clear_screen()
             console.print(Panel.fit("[bold white]File Tree Viewer[/bold white]", style="white"))

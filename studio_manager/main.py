@@ -50,7 +50,7 @@ def main():
             elif objective == "2":
                 tasks_and_projects_flow(history)
             elif objective == "3":
-                project_browser_flow()
+                project_browser_flow(history)
             elif objective == "4":
                 album_management_flow()
             elif objective == "5":

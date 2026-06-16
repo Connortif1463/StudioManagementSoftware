@@ -166,39 +166,47 @@ def project_browser_flow(history):
     if finished_projects:
         print_separator()
         console.print(f"[dim]Note: {len(finished_projects)} finished project(s) not shown.[/dim]")
-        console.print("[dim]To view or reopen finished projects, go to Tasks & Projects menu[/dim]")
     
     print_separator()
     console.print("[bold]Options:[/bold]")
-    console.print("  [cyan]s[/cyan] - Search projects")
-    console.print("  [cyan]a[/cyan] - Select project to open")
+    console.print("  [cyan]1[/cyan] - Select project to open")
+    console.print("  [cyan]2[/cyan] - Search projects")
+    console.print("  [cyan]3[/cyan] - View finished projects")
     console.print("  [cyan]b[/cyan] - Go back")
     
     sub_choice = input("\nSelect option: ").strip().lower()
     
     if sub_choice == 'b':
         return
-    elif sub_choice == 's':
+    elif sub_choice == "1":
+        if active_projects:
+            while True:
+                choice = input("\nEnter project number to open (or 'b' to go back): ").strip()
+                if choice.lower() in ['b', 'back', 'backtrack']:
+                    return
+                if choice.isdigit():
+                    idx = int(choice) - 1
+                    if 0 <= idx < len(active_projects):
+                        project, ptype, stage = active_projects[idx]
+                        if ptype == "Album":
+                            show_album_contents(project["path"])
+                        else:
+                            show_song_project_details(project, history)
+                        return
+                    else:
+                        print_error("Invalid project number")
+                else:
+                    print_error("Please enter a valid number")
+        else:
+            print_warning("No active projects to open")
+            input("\nPress Enter to continue...")
+    elif sub_choice == "2":
         from .tasks_flows import search_projects_flow
         search_projects_flow()
         return
-    elif sub_choice == 'a' and active_projects:
-        while True:
-            choice = input("\nEnter project number to open (or 'b' to go back): ").strip()
-            if choice.lower() in ['b', 'back', 'backtrack']:
-                return
-            if choice.isdigit():
-                idx = int(choice) - 1
-                if 0 <= idx < len(active_projects):
-                    project, ptype, stage = active_projects[idx]
-                    if ptype == "Album":
-                        show_album_contents(project["path"])
-                    else:
-                        show_song_project_details(project, history)
-                    return
-                else:
-                    print_error("Invalid project number")
-            else:
-                print_error("Please enter a valid number")
+    elif sub_choice == "3":
+        from .tasks_flows import view_finished_projects_flow
+        view_finished_projects_flow()
+        return
     else:
         print_error("Invalid option")

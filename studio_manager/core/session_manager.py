@@ -1,23 +1,21 @@
 import logging
-# Only show WARNING and above, not INFO
-logging.basicConfig(level=logging.WARNING)
 import shutil
 from pathlib import Path
 from rich.progress import Progress, SpinnerColumn, TextColumn
 from ..cli.display import console, print_success, print_error, print_warning
 from ..utils.constants import DAW_PATHS
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.WARNING)
 
 TEMPLATES_BASE = Path.cwd() / "templates"
 
 def get_template_path(daw: str) -> Path:
     """Get the template path for a given DAW"""
-    if daw == "A" or daw == "Ableton":
+    if daw == "A":
         return TEMPLATES_BASE / "ableton templates" / "ableton template.als"
-    elif daw == "P" or daw == "Pro Tools":
+    elif daw == "P":
         return TEMPLATES_BASE / "protools templates" / "protools template.ptx"
-    elif daw == "L" or daw == "Logic":
+    elif daw == "L":
         return TEMPLATES_BASE / "logic templates" / "logic template.logicx"
     return None
 
@@ -36,8 +34,11 @@ def check_templates() -> bool:
         print_warning("Templates not found")
         return False
 
-def create_session_from_template(name: str, artist: str, daw: str) -> bool:
-    """Create a new session from template"""
+def create_session_from_template(name: str, artist: str, daw: str, stage: str = "production") -> bool:
+    """
+    Create a new session from template inside the specified stage folder.
+    Stages: production, mix, master
+    """
     try:
         if not check_templates():
             return False
@@ -50,17 +51,18 @@ def create_session_from_template(name: str, artist: str, daw: str) -> bool:
             print_error(f"No template found for DAW: {daw}")
             return False
         
-        session_dir = Path.cwd() / "artists" / artist / name / daw_folder
+        # Create session inside the stage folder (production/mix/master)
+        session_dir = Path.cwd() / "artists" / artist / name / stage / daw_folder
         session_dir.mkdir(parents=True, exist_ok=True)
         
-        with Progress(SpinnerColumn(), TextColumn("[progress.description]{task.description}"), console=console) as progress:
-            task = progress.add_task(f"[white]Copying {daw_folder} template...", total=None)
-            destination = session_dir / template_path.name
+        with Progress(SpinnerColumn(), TextColumn("[progress.description]{task.description}"), console=console, transient=True) as progress:
+            task = progress.add_task(f"[white]Copying {daw_folder} template to {stage} folder...", total=None)
+            destination = session_dir / f"{name}_{stage}_session{daw_info.get('ext', '')}"
             shutil.copy2(template_path, destination)
             progress.update(task, completed=True)
         
         print_success(f"{daw_folder.capitalize()} template copied to: {destination}")
-        logging.debug(f"Session created: {name} for {artist} using {daw}")
+        logging.debug(f"Session created: {name} for {artist} using {daw} in {stage} stage")
         return True
         
     except Exception as e:
