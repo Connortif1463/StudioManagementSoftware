@@ -8,39 +8,41 @@ import sys
 import os
 from pathlib import Path
 
-# Add the current directory to path so we can import studio_manager and tests
+# Add the current directory to path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-# Run all tests
 if __name__ == "__main__":
     print("=" * 60)
     print("STUDIO MANAGEMENT SYSTEM - TEST SUITE")
     print("=" * 60)
     print("\nRunning all tests...\n")
     
-    # Import and run each test module
     from tests.test_cli import run_cli_tests
     from tests.test_core import run_core_tests
     from tests.test_features import run_features_tests
     from tests.test_data import run_data_tests
     from tests.test_integration import run_integration_tests
+    from tests.test_stage_migration import run_stage_migration_tests
     
     results = []
     
-    print("\n[1/5] Testing CLI modules...")
+    print("\n[1/6] Testing CLI modules...")
     results.append(("CLI", run_cli_tests()))
     
-    print("\n[2/5] Testing Core modules...")
+    print("\n[2/6] Testing Core modules...")
     results.append(("Core", run_core_tests()))
     
-    print("\n[3/5] Testing Features modules...")
+    print("\n[3/6] Testing Features modules...")
     results.append(("Features", run_features_tests()))
     
-    print("\n[4/5] Testing Data modules...")
+    print("\n[4/6] Testing Data modules...")
     results.append(("Data", run_data_tests()))
     
-    print("\n[5/5] Running Integration tests...")
+    print("\n[5/6] Testing Integration...")
     results.append(("Integration", run_integration_tests()))
+    
+    print("\n[6/6] Testing Stage Migration...")
+    results.append(("Stage Migration", run_stage_migration_tests()))
     
     # Summary
     print("\n" + "=" * 60)

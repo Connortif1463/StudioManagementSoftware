@@ -581,17 +581,26 @@ class SessionMemo:
         # Reverse to show most recent first
         sessions = list(reversed(self.memos["sessions"]))
         total = len(sessions)
-        current_idx = 0
+        current_idx = 0  # Start at most recent
         
         while True:
             clear_screen()
             memo = sessions[current_idx]
             
+            # Calculate display number: most recent = total, oldest = 1
+            display_num = total - current_idx
+            
             # Header with navigation info
-            console.print(Panel.fit(
-                f"[bold white]Session Memo {current_idx + 1} of {total}[/bold white]", 
-                style="white"
-            ))
+            if current_idx == 0:
+                console.print(Panel.fit(
+                    f"[bold white]Session Memo {display_num} of {total} (Most Recent)[/bold white]", 
+                    style="white"
+                ))
+            else:
+                console.print(Panel.fit(
+                    f"[bold white]Session Memo {display_num} of {total}[/bold white]", 
+                    style="white"
+                ))
             
             # Display memo content
             console.print(f"\n[bold cyan]Date:[/bold cyan] [yellow]{memo['date']} at {memo['time']}[/yellow]")
@@ -629,11 +638,11 @@ class SessionMemo:
             
             nav_options = []
             if current_idx > 0:
-                nav_options.append("[cyan]p[/cyan] - Previous")
+                nav_options.append("[cyan]p[/cyan] - Newer")
             if current_idx < total - 1:
-                nav_options.append("[cyan]n[/cyan] - Next")
-            nav_options.append("[cyan]f[/cyan] - First")
-            nav_options.append("[cyan]l[/cyan] - Last")
+                nav_options.append("[cyan]n[/cyan] - Older")
+            nav_options.append("[cyan]f[/cyan] - First (Most Recent)")
+            nav_options.append("[cyan]l[/cyan] - Last (Oldest)")
             nav_options.append("[cyan]e[/cyan] - Edit this memo")
             nav_options.append("[cyan]q[/cyan] - Quit")
             
@@ -644,13 +653,13 @@ class SessionMemo:
             if choice == 'q':
                 break
             elif choice == 'p' and current_idx > 0:
-                current_idx -= 1
+                current_idx -= 1  # Go to newer memo (decrease index)
             elif choice == 'n' and current_idx < total - 1:
-                current_idx += 1
+                current_idx += 1  # Go to older memo (increase index)
             elif choice == 'f':
-                current_idx = 0
+                current_idx = 0  # Jump to first (most recent)
             elif choice == 'l':
-                current_idx = total - 1
+                current_idx = total - 1  # Jump to last (oldest)
             elif choice == 'e':
                 # Edit the current memo
                 self.edit_existing_memo(memo)
@@ -658,7 +667,6 @@ class SessionMemo:
                 self.memos = self.load_memos()
                 sessions = list(reversed(self.memos["sessions"]))
                 total = len(sessions)
-                # Keep at same index or adjust if needed
                 if current_idx >= total:
                     current_idx = total - 1
             else:

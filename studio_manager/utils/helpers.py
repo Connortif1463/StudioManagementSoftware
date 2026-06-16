@@ -28,7 +28,7 @@ def get_project_path(artist: str, project_name: str) -> Path:
     return Path.cwd() / "artists" / sanitize_filename(artist) / sanitize_filename(project_name)
 
 def list_all_projects() -> List[dict]:
-    """List all projects in the artists directory"""
+    """List all projects in the artists directory (excluding backups)"""
     projects = []
     artists_path = Path.cwd() / "artists"
     
@@ -39,6 +39,9 @@ def list_all_projects() -> List[dict]:
         if artist_dir.is_dir():
             for project_dir in artist_dir.iterdir():
                 if project_dir.is_dir():
+                    # Skip backup folders (folders with "_backup_" in the name)
+                    if "_backup_" in project_dir.name:
+                        continue
                     projects.append({
                         "artist": artist_dir.name,
                         "project": project_dir.name,

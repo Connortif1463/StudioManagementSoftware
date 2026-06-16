@@ -4,8 +4,7 @@ from .display import console, print_menu
 
 def show_main_menu():
     """Display the main menu with clear descriptions"""
-    menu_text = """
-[bold white]Main Menu[/bold white]
+    menu_text = """[bold white]Main Menu[/bold white]
 
 [cyan]1[/cyan] - Create New Project
     Create a new song or album project with session templates
@@ -27,7 +26,6 @@ def show_main_menu():
 
 [cyan]q[/cyan] - Quit
     Exit the application
-
 """
     print_menu(menu_text, title="Studio Management System")
 

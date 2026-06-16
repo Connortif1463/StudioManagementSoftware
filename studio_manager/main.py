@@ -13,13 +13,14 @@ from .features.project_flows import new_project_flow
 from .features.backup_flows import global_backup_flow
 from .features.tasks_flows import tasks_and_projects_flow
 from .features.browser_flows import project_browser_flow
-from .features.album_flows import album_management_flow
+from .features.album_flows import album_management_flow, set_album_history
 from .utils.helpers import list_all_projects
 
 # Initialize
 history = ProjectHistory()
 session_logger = SessionLogger()
 set_history(history)
+set_album_history(history)
 
 def main():
     """Main program entry point"""
@@ -29,7 +30,7 @@ def main():
     clear_screen()
     console.print(Panel.fit("[bold white]Studio Management System[/bold white]", 
                           subtitle="Version 1.0.0", style="white"))
-    input("\nPress Enter to continue...")
+    input("\nPress Enter to continue... ")
     
     while True:
         try:

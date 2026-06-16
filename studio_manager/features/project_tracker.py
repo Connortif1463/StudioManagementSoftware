@@ -134,28 +134,58 @@ class ProjectTracker:
         """Get project category"""
         return self.data.get("project_category", "studio_session")
     
-    def create_backup(self, backup_path: Path = None, engineer: str = None) -> bool:
-        """Create a backup of the project with metadata"""
+    def create_backup(self, backup_path: Path = None, engineer: str = None, stage: str = None) -> bool:
+        """Create a backup of the current project stage or specific stage"""
+        import shutil
+        from datetime import datetime
+        
+        # If no stage specified, use current stage
+        if stage is None:
+            stage = self.data["current_stage"]
+        
+        # Validate stage
+        if stage not in self.STAGES:
+            print_error(f"Invalid stage. Choose from: {', '.join(self.STAGES)}")
+            return False
+        
+        stage_path = self.project_path / stage
+        if not stage_path.exists():
+            print_error(f"Stage folder '{stage}' does not exist for this project")
+            return False
+        
         if backup_path is None:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            backup_path = self.project_path.parent / f"{self.project_path.name}_backup_{timestamp}"
+            backup_path = self.project_path.parent / f"{self.project_path.name}_{stage}_backup_{timestamp}"
         
         try:
-            print_info(f"Creating backup at {backup_path}...")
-            shutil.copytree(self.project_path, backup_path, 
-                        ignore=shutil.ignore_patterns('*.pyc', '__pycache__', '.DS_Store', '*.backup'))
+            print_info(f"Creating backup of {stage} stage at {backup_path}...")
             
+            # Create backup directory
+            backup_path.mkdir(parents=True, exist_ok=True)
+            
+            # Copy the stage folder contents
+            for item in stage_path.iterdir():
+                if item.is_file():
+                    shutil.copy2(item, backup_path / item.name)
+                elif item.is_dir():
+                    shutil.copytree(item, backup_path / item.name, 
+                                ignore=shutil.ignore_patterns('*.pyc', '__pycache__', '.DS_Store'))
+            
+            # Calculate size
             total_size = sum(f.stat().st_size for f in backup_path.rglob('*') if f.is_file()) / (1024 * 1024)
+            files_backed_up = len(list(backup_path.rglob('*')))
             
+            # Create metadata file
             metadata = {
                 "backup_created": datetime.now().isoformat(),
                 "backup_created_pretty": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                 "original_project_path": str(self.project_path),
                 "project_name": self.data["project_name"],
+                "stage_backed_up": stage,
                 "current_stage": self.data["current_stage"],
                 "engineer": engineer or "Unknown",
                 "size_mb": total_size,
-                "files_backed_up": len(list(backup_path.rglob('*'))),
+                "files_backed_up": files_backed_up,
                 "stage_history": self.data["stage_history"][-3:],
             }
             
@@ -166,12 +196,13 @@ class ProjectTracker:
                 f.write(f"Backup Created: {metadata['backup_created_pretty']}\n")
                 f.write(f"Engineer: {metadata['engineer']}\n")
                 f.write(f"Project: {metadata['project_name']}\n")
-                f.write(f"Stage at Backup: {metadata['current_stage']}\n")
+                f.write(f"Stage Backed Up: {metadata['stage_backed_up']}\n")
+                f.write(f"Current Project Stage: {metadata['current_stage']}\n")
                 f.write(f"Backup Size: {metadata['size_mb']:.2f} MB\n")
                 f.write(f"Files Backed Up: {metadata['files_backed_up']}\n\n")
                 f.write(f"Stage History:\n")
-                for stage in metadata['stage_history']:
-                    f.write(f"  - {stage.get('stage')} (started: {stage.get('started', 'Unknown')[:19]})\n")
+                for s in metadata['stage_history']:
+                    f.write(f"  - {s.get('stage')} (started: {s.get('started', 'Unknown')[:19]})\n")
                 f.write(f"\nOriginal Project Path: {metadata['original_project_path']}\n")
             
             backup_entry = {
@@ -180,13 +211,16 @@ class ProjectTracker:
                 "created_pretty": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                 "size_mb": total_size,
                 "engineer": engineer or "Unknown",
+                "stage": stage,
                 "metadata_file": str(metadata_file)
             }
             self.data["backups"].append(backup_entry)
             self.save()
             
-            print_success(f"Backup created: {backup_path}")
+            print_success(f"Backup of {stage} stage created: {backup_path}")
             print_info(f"Size: {total_size:.2f} MB")
+            print_info(f"Files: {files_backed_up}")
+            print_info(f"Backup info saved to: {metadata_file}")
             return True
         except Exception as e:
             print_error(f"Backup failed: {e}")
@@ -201,12 +235,14 @@ class ProjectTracker:
         table = Table(title=f"Backups for {self.data['project_name']}", style="white")
         table.add_column("#", style="cyan", width=4)
         table.add_column("Date", style="green")
+        table.add_column("Stage", style="yellow")
         table.add_column("Path", style="dim")
-        table.add_column("Size (MB)", style="yellow", width=10)
+        table.add_column("Size (MB)", style="magenta", width=10)
         
         for idx, backup in enumerate(reversed(self.data["backups"]), 1):
             date = datetime.fromisoformat(backup["created"]).strftime("%Y-%m-%d %H:%M:%S")
-            table.add_row(str(idx), date, backup["path"], f"{backup['size_mb']:.2f}")
+            stage = backup.get("stage", "Unknown")
+            table.add_row(str(idx), date, stage, backup["path"], f"{backup['size_mb']:.2f}")
         
         console.print(table)
 

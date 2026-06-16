@@ -117,17 +117,32 @@ class ProjectHistory:
         return suggestions
     
     def get_stats(self) -> dict:
-        """Get formatted statistics"""
+        """Get formatted statistics - scans filesystem for accurate album counts"""
+        # Get stats from history
+        total_songs = self.data["session_stats"]["total_songs"]
+        total_albums_from_history = self.data["session_stats"]["total_albums"]
+        unique_artists = len(self.data["artists"])
+        unique_engineers = len(self.data["engineers"])
+        
+        # Scan filesystem for albums to get accurate count
+        albums_path = Path.cwd() / "artists"
+        fs_albums = 0
+        
+        if albums_path.exists():
+            for artist_dir in albums_path.iterdir():
+                if artist_dir.is_dir():
+                    for project_dir in artist_dir.iterdir():
+                        if project_dir.is_dir() and (project_dir / ".album.json").exists():
+                            fs_albums += 1
+        
+        # Use the filesystem count for albums (more accurate)
+        total_albums = fs_albums
+        
         return {
-            "total_songs": self.data["session_stats"]["total_songs"],
-            "total_albums": self.data["session_stats"]["total_albums"],
-            "unique_artists": len(self.data["artists"]),
-            "unique_engineers": len(self.data["engineers"]),
+            "total_songs": total_songs,
+            "total_albums": total_albums,
+            "unique_artists": unique_artists,
+            "unique_engineers": unique_engineers,
             "by_daw": self.data["session_stats"]["by_daw"],
             "by_artist": self.data["session_stats"]["by_artist"]
         }
-    
-    def get_recent_projects(self, limit: int = 5) -> List[Dict]:
-        """Get recent projects"""
-        sorted_projects = sorted(self.data["projects"], key=lambda x: x.get("timestamp", 0), reverse=True)
-        return sorted_projects[:limit]

@@ -79,7 +79,7 @@ def show_recent_projects_table(projects: list):
 
 def show_statistics_table(stats: dict):
     """Display statistics in a table"""
-    table = Table(title="Project Statistics", style="white")
+    table = Table(title="Project Statistics", style="white", width=60)
     table.add_column("Metric", style="bold")
     table.add_column("Value", style="white")
     

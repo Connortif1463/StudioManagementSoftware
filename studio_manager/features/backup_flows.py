@@ -12,10 +12,15 @@ def backup_project_flow(project_path: Path):
     
     console.print(Panel.fit("[bold white]Project Backup[/bold white]", style="white"))
     
-    console.print("\n[bold]Options:[/bold]")
-    console.print("  1 - Create new backup")
-    console.print("  2 - List existing backups")
-    console.print("  b - Go back")
+    # Shows current stage
+    console.print(f"\nProject: [green]{tracker.data['project_name']}[/green]")
+    console.print(f"Current Stage: [cyan]{tracker.get_current_stage()}[/cyan]")
+    
+    console.print("\n[bold]Backup Options:[/bold]")
+    console.print("  [cyan]1[/cyan] - Backup current stage")
+    console.print("  [cyan]2[/cyan] - Backup a specific stage")
+    console.print("  [cyan]3[/cyan] - List existing backups")
+    console.print("  [cyan]b[/cyan] - Go back")
     
     choice = input("\nSelect option: ").strip()
     
@@ -30,8 +35,41 @@ def backup_project_flow(project_path: Path):
         else:
             tracker.create_backup(engineer=engineer)
         input("\nPress Enter to continue...")
+    
     elif choice == "2":
+        console.print("\n[bold]Available Stages:[/bold]")
+        for i, stage in enumerate(ProjectTracker.STAGES, 1):
+            stage_path = project_path / stage
+            exists = "✓" if stage_path.exists() else "✗"
+            current = " [current]" if stage == tracker.get_current_stage() else ""
+            console.print(f"  [cyan]{i}[/cyan] - {stage}{current} [{exists}]")
+        
+        stage_choice = input("\nSelect stage number: ").strip()
+        if stage_choice.isdigit():
+            idx = int(stage_choice) - 1
+            if 0 <= idx < len(ProjectTracker.STAGES):
+                selected_stage = ProjectTracker.STAGES[idx]
+                engineer = input("Enter engineer name (or press Enter to skip): ").strip()
+                if not engineer:
+                    engineer = None
+                custom_path = input("Enter backup path (or press Enter for auto-generated): ").strip()
+                if custom_path:
+                    tracker.create_backup(Path(custom_path), engineer, selected_stage)
+                else:
+                    tracker.create_backup(engineer=engineer, stage=selected_stage)
+                input("\nPress Enter to continue...")
+        else:
+            print_error("Invalid stage selection")
+            input("\nPress Enter to continue...")
+    
+    elif choice == "3":
         tracker.list_backups()
+        input("\nPress Enter to continue...")
+    
+    elif choice == 'b':
+        return
+    else:
+        print_error("Invalid option")
         input("\nPress Enter to continue...")
 
 def global_backup_flow():

@@ -1,5 +1,6 @@
 """Tasks and projects flow - statistics, memos, finished projects, search"""
 from pathlib import Path
+from datetime import datetime
 from rich.panel import Panel
 from rich.table import Table
 from ..cli.display import clear_screen, console, print_success, print_error, print_warning, print_info, print_separator, show_statistics_table
@@ -11,10 +12,14 @@ from .browser_flows import show_song_project_details
 
 def view_project_memos_flow():
     """Flow for viewing memos from a project - excludes finished projects"""
+    clear_screen()
+    console.print(Panel.fit("[bold white]View Session Memos[/bold white]", style="white"))
+    
     projects = list_all_projects()
     
     if not projects:
         print_warning("No projects found")
+        input("\nPress Enter to continue...")
         return
     
     active_songs = []
@@ -29,6 +34,7 @@ def view_project_memos_flow():
     
     if not active_songs:
         print_warning("No active song projects with session memos found")
+        input("\nPress Enter to continue...")
         return
     
     table = Table(title="Select Project", style="white")
@@ -55,13 +61,25 @@ def view_project_memos_flow():
                 memo.view_memos(interactive=False)
             else:
                 memo.view_memos(interactive=True)
+        else:
+            print_error("Invalid project number")
+            input("\nPress Enter to continue...")
+    elif proj_choice.lower() == 'b':
+        return
+    
+    # If we get here (user pressed b or invalid), return to tasks menu
+    return
 
 def set_release_date_flow():
     """Flow for setting expected release date on a project - excludes finished projects"""
+    clear_screen()
+    console.print(Panel.fit("[bold white]Set Release Date[/bold white]", style="white"))
+    
     projects = list_all_projects()
     
     if not projects:
         print_warning("No projects found")
+        input("\nPress Enter to continue...")
         return
     
     active_songs = []
@@ -75,6 +93,7 @@ def set_release_date_flow():
     
     if not active_songs:
         print_warning("No active song projects found")
+        input("\nPress Enter to continue...")
         return
     
     table = Table(title="Set Release Date", style="white")
@@ -93,20 +112,42 @@ def set_release_date_flow():
     console.print(table)
     
     proj_choice = input("\nSelect project number (or 'b' to go back): ").strip()
-    if proj_choice.lower() != 'b' and proj_choice.isdigit():
-        idx = int(proj_choice) - 1
-        if 0 <= idx < len(active_songs):
-            project, tracker = active_songs[idx]
-            while True:
-                release_date = input("Enter expected release date (YYYY-MM-DD) or press Enter to cancel: ").strip()
-                if not release_date:
-                    break
-                if tracker.set_release_date(release_date):
-                    print_success(f"Release date set for {project['project']}")
-                    break
-                else:
-                    print_error("Invalid date format. Please use YYYY-MM-DD")
-                    continue
+    if proj_choice.lower() == 'b':
+        return
+    
+    if not proj_choice.isdigit():
+        print_error("Please enter a valid number")
+        input("\nPress Enter to continue...")
+        return
+    
+    idx = int(proj_choice) - 1
+    if idx < 0 or idx >= len(active_songs):
+        print_error("Invalid project number")
+        input("\nPress Enter to continue...")
+        return
+    
+    project, tracker = active_songs[idx]
+    
+    while True:
+        release_date = input("\nEnter expected release date (YYYY-MM-DD) or press Enter to cancel: ").strip()
+        if not release_date:
+            print_info("Cancelled")
+            input("\nPress Enter to continue...")
+            return
+        
+        # Validate date format
+        try:
+            datetime.fromisoformat(release_date)
+            # Valid date, set it
+            tracker.data["release_date"] = release_date
+            tracker.calculate_priority()
+            tracker.save()
+            print_success(f"Release date set for {project['project']} to {release_date}")
+            input("\nPress Enter to continue...")
+            return
+        except ValueError:
+            print_error("Invalid date format. Please use YYYY-MM-DD (e.g., 2026-04-20)")
+            continue
 
 def view_finished_projects_flow():
     """View all finished projects"""
@@ -126,7 +167,8 @@ def view_finished_projects_flow():
             finished_songs.append(project)
     
     if not finished_songs:
-        print_info("No finished projects found")
+        print_info("\n  No finished projects found!")
+        input("\nPress Enter to continue...")
         return
     
     table = Table(title="Completed Projects", style="white")
@@ -164,8 +206,22 @@ def view_finished_projects_flow():
                 if get_confirmation(f"Move '{project['project']}' back to mastering?"):
                     tracker.update_stage("mastering", "Reopened from finished")
                     print_success(f"Project '{project['project']}' moved back to mastering")
-                    view_finished_projects_flow()
+                    input("\nPress Enter to continue...")
+                    return  # Return after reopening
+                else:
+                    input("\nPress Enter to continue...")
                     return
+            else:
+                print_error("Invalid project number")
+                input("\nPress Enter to continue...")
+                return
+        else:
+            print_error("Please enter a valid number")
+            input("\nPress Enter to continue...")
+            return
+    else:
+        # If they don't want to reopen, just return
+        return
 
 def search_projects_flow():
     """Search for projects by name, artist, or stage"""
@@ -251,12 +307,12 @@ def search_projects_flow():
                     "path": project["path"]
                 })
 
-def filter_by_category_flow():
-    """Filter active songs by project category"""
+def filter_by_category_flow(history):
+    """Filter active songs by project category and allow actions"""
     clear_screen()
     console.print(Panel.fit("[bold white]Filter by Category[/bold white]", style="white"))
     
-    console.print("\n[bold]Categories:[/bold]")
+    console.print("\n[bold]Categories:\n[/bold]")
     console.print("  [cyan]1[/cyan] - Studio Sessions")
     console.print("  [cyan]2[/cyan] - Live Recordings")
     console.print("  [cyan]3[/cyan] - Demos")
@@ -280,6 +336,7 @@ def filter_by_category_flow():
         return
     if choice not in category_map:
         print_error("Invalid option")
+        input("\nPress Enter to continue...")
         return
     
     selected_category = category_map[choice]
@@ -299,7 +356,7 @@ def filter_by_category_flow():
             filtered.append((project, tracker.get_current_stage(), category))
     
     if not filtered:
-        print_info(f"No projects found in this category")
+        print_info(f"\nNo projects found in this category")
         input("\nPress Enter to continue...")
         return
     
@@ -308,12 +365,77 @@ def filter_by_category_flow():
     table.add_column("Project", style="green")
     table.add_column("Artist", style="yellow")
     table.add_column("Stage", style="magenta")
+    table.add_column("Category", style="dim")
     
     for idx, (project, stage, category) in enumerate(filtered, 1):
-        table.add_row(str(idx), project["project"], project["artist"], stage)
+        display_category = category.replace('_', ' ').title()
+        table.add_row(str(idx), project["project"], project["artist"], stage, display_category)
     
     console.print(table)
-    input("\nPress Enter to continue...")
+    
+    print_separator()
+    console.print("[bold]Options:[/bold]")
+    console.print("  [cyan]1[/cyan] - Open a project from the list")
+    console.print("  [cyan]2[/cyan] - View session memos from a project")
+    console.print("  [cyan]3[/cyan] - Set release date for a project")
+    console.print("  [cyan]b[/cyan] - Go back")
+    
+    action = input("\nSelect option: ").strip().lower()
+    
+    if action == 'b':
+        return
+    
+    if action not in ["1", "2", "3"]:
+        print_error("Invalid option")
+        input("\nPress Enter to continue...")
+        return
+    
+    proj_choice = input("\nEnter project number: ").strip()
+    if not proj_choice.isdigit():
+        print_error("Please enter a valid number")
+        input("\nPress Enter to continue...")
+        return
+    
+    idx = int(proj_choice) - 1
+    if idx < 0 or idx >= len(filtered):
+        print_error("Invalid project number")
+        input("\nPress Enter to continue...")
+        return
+    
+    project, stage, category = filtered[idx]
+    project_path = project["path"]
+    
+    if action == "1":
+        # Open the project
+        from .browser_flows import show_song_project_details
+        show_song_project_details(project, history)
+    elif action == "2":
+        # View memos
+        memo = SessionMemo(project_path)
+        view_choice = input("\nInteractive navigation? (y/n, default y): ").strip().lower()
+        if view_choice == 'n':
+            memo.view_memos(interactive=False)
+        else:
+            memo.view_memos(interactive=True)
+        input("\nPress Enter to continue...")
+    elif action == "3":
+        # Set release date
+        tracker = ProjectTracker(project_path)
+        while True:
+            release_date = input("\nEnter expected release date (YYYY-MM-DD) or press Enter to cancel: ").strip()
+            if not release_date:
+                break
+            try:
+                datetime.fromisoformat(release_date)
+                tracker.data["release_date"] = release_date
+                tracker.calculate_priority()
+                tracker.save()
+                print_success(f"Release date set for {project['project']} to {release_date}")
+                break
+            except ValueError:
+                print_error("Invalid date format. Please use YYYY-MM-DD")
+                continue
+        input("\nPress Enter to continue...")
 
 def tasks_and_projects_flow(history):
     """Tasks and Projects - view statistics, memos, finished projects, search"""
@@ -324,29 +446,33 @@ def tasks_and_projects_flow(history):
     
     active_songs = []
     finished_songs = []
-    albums = []
     
     for project in projects:
-        is_album = (project["path"] / ".album.json").exists()
-        if is_album:
-            albums.append(project)
+        # Skip albums - they have .album.json file
+        if (project["path"] / ".album.json").exists():
+            continue
+        
+        # Skip backup folders
+        if "_backup_" in project["project"]:
+            continue
+        
+        # It's a song project
+        tracker = ProjectTracker(project["path"])
+        stage = tracker.get_current_stage()
+        project["stage"] = stage
+        
+        if stage == "finished":
+            finished_songs.append(project)
         else:
-            tracker = ProjectTracker(project["path"])
-            stage = tracker.get_current_stage()
-            project["stage"] = stage
-            
-            if stage == "finished":
-                finished_songs.append(project)
-            else:
-                tracker.calculate_priority()
-                project["priority"] = tracker.data.get("priority_score", 0)
-                project["release_date"] = tracker.data.get("release_date")
-                active_songs.append(project)
+            tracker.calculate_priority()
+            project["priority"] = tracker.data.get("priority_score", 0)
+            project["release_date"] = tracker.data.get("release_date")
+            active_songs.append(project)
     
     active_songs.sort(key=lambda x: x.get("priority", 0), reverse=True)
     
     if active_songs:
-        table = Table(title="Active Songs", style="white")
+        table = Table(title="Active Songs", style="white", expand=True)
         table.add_column("#", style="cyan", width=4)
         table.add_column("Priority", style="red", width=10, justify="center")
         table.add_column("Date", style="cyan")
@@ -387,35 +513,11 @@ def tasks_and_projects_flow(history):
     else:
         console.print("[dim]No active songs in progress[/dim]")
     
-    if albums:
+    # Show finished songs count
+    if finished_songs:
         print_separator()
-        table = Table(title="Albums", style="white")
-        table.add_column("#", style="cyan", width=4)
-        table.add_column("Date", style="cyan")
-        table.add_column("Album Name", style="green")
-        table.add_column("Artist", style="yellow")
-        
-        for idx, project in enumerate(albums, 1):
-            created_pretty = "Unknown"
-            album_file = project["path"] / ".album.json"
-            if album_file.exists():
-                import json
-                with open(album_file, 'r') as f:
-                    album_data = json.load(f)
-                    created_pretty = album_data.get("created", "Unknown")[:16]
-            else:
-                import time
-                mod_time = project["path"].stat().st_ctime
-                created_pretty = time.strftime("%Y-%m-%d %H:%M", time.localtime(mod_time))
-            
-            table.add_row(
-                str(idx),
-                created_pretty,
-                project["project"],
-                project["artist"]
-            )
-        
-        console.print(table)
+        console.print(f"[dim]Note: {len(finished_songs)} finished song(s) not shown.[/dim]")
+        console.print("[dim]To view finished songs, go to Project Browser → View finished projects[/dim]")
     
     print_separator()
     stats = history.get_stats()
@@ -433,7 +535,6 @@ def tasks_and_projects_flow(history):
     choice = input("\nSelect option: ").strip().lower()
     
     if choice == "1":
-        # Open a project from the active songs list
         if active_songs:
             proj_choice = input("\nEnter the number of the project to open: ").strip()
             if proj_choice.isdigit():
@@ -447,21 +548,44 @@ def tasks_and_projects_flow(history):
                 else:
                     print_error("Invalid project number")
                     input("\nPress Enter to continue...")
+                    tasks_and_projects_flow(history)
+                    return
             else:
                 print_error("Please enter a valid number")
                 input("\nPress Enter to continue...")
+                tasks_and_projects_flow(history)
+                return
         else:
             print_warning("No active projects to open")
             input("\nPress Enter to continue...")
+            tasks_and_projects_flow(history)
+            return
+    
     elif choice == "2":
         view_project_memos_flow()
+        tasks_and_projects_flow(history)
+        return
+    
     elif choice == "3":
         set_release_date_flow()
+        tasks_and_projects_flow(history)
+        return
+    
     elif choice == "4":
         search_projects_flow()
+        tasks_and_projects_flow(history)
+        return
+    
     elif choice == "5":
-        filter_by_category_flow()
+        filter_by_category_flow(history)
+        tasks_and_projects_flow(history)
+        return
+    
     elif choice == 'b':
         return
     
-    input("\nPress Enter to continue...")
+    else:
+        print_error("Invalid option")
+        input("\nPress Enter to continue...")
+        tasks_and_projects_flow(history)
+        return
