@@ -2,7 +2,7 @@
 
 #### Prerequisites
 - Python 3.7 or higher
-- pip (Python package manager)
+- pip -> Rich module: (pip install rich)
 
 #### Install from GitHub
 
