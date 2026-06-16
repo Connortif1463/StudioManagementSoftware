@@ -43,7 +43,7 @@ artists/
         │   └── project_master_session.ptx
         ├── finished/
         │   └── final_master.wav
-        └── .project_tracker.json   # Project metadata
+        └── .project_tracker.json
 ```
 
 ## DAW Templates
