@@ -6,7 +6,7 @@ from rich.table import Table
 from ..cli.display import clear_screen, console, print_success, print_error, print_warning, print_info, print_separator
 from ..cli.prompts import get_confirmation
 from .project_tracker import ProjectTracker, AlbumManager
-from .open_project import ProjectOpener  # Changed from daw_integration
+from .open_project import ProjectOpener
 from .session_memo import prompt_for_session_memo
 from .backup_flows import backup_project_flow
 from ..utils.helpers import list_all_projects
@@ -162,7 +162,7 @@ def show_album_contents(album_path: Path):
                 song_path = Path(manager.data["songs"][song_idx]["path"])
                 opener = ProjectOpener()
                 opener.open_project_interactive(song_path)
-                show_album_contents(album_path)  # Refresh after returning
+                show_album_contents(album_path)
 
 
 def search_and_open_flow(history):
@@ -205,7 +205,7 @@ def search_and_open_flow(history):
             if search_term in project["artist"].lower():
                 results.append(project)
     
-    elif search_type == "3":  # Created date
+    elif search_type == "3":  # date created
         date_str = input("        Enter created date (YYYY-MM-DD): ").strip()
         console.print("")
         try:
@@ -241,11 +241,13 @@ def search_and_open_flow(history):
             for project in all_projects:
                 project_path = project["path"]
                 import time
+
                 # Check last modified time of the project folder
                 mod_time = project_path.stat().st_mtime
                 modified_date = datetime.fromtimestamp(mod_time).date()
                 if modified_date == target_date:
                     results.append(project)
+                    
                 # Also check tracker's last_modified
                 tracker = ProjectTracker(project_path)
                 if tracker.data.get("last_modified"):
