@@ -22,53 +22,119 @@ from .project_tracker import ProjectTracker
 from ..utils.constants import DAW_MAP, DAW_PATHS
 
 
+def get_daw_process_identifiers(daw_code: str) -> dict:
+    """
+    Get process identifiers for a DAW.
+    Returns a dict with process names and bundle IDs for better detection.
+    """
+    identifiers = {
+        "A": {
+            "names": ["Ableton Live", "Ableton Live 11", "Ableton Live 11 Suite", 
+                     "Ableton Live 12", "Ableton Live 12 Suite", "Ableton"],
+            "bundle_ids": ["com.ableton.live", "com.ableton.Live", "com.ableton.Live11", "com.ableton.Live12"]
+        },
+        "P": {
+            "names": ["Pro Tools", "ProTools", "Pro Tools Ultimate"],
+            "bundle_ids": ["com.avid.ProTools", "com.avid.ProToolsUltimate"]
+        },
+        "L": {
+            "names": ["Logic Pro X", "Logic Pro", "Logic"],
+            "bundle_ids": ["com.apple.logic10", "com.apple.logic"]
+        }
+    }
+    return identifiers.get(daw_code, {"names": ["DAW"], "bundle_ids": []})
+
+
 def get_daw_process_name(daw_code: str) -> str:
-    """Get the process name for a DAW"""
-    process_names = {
+    """Get the display name for a DAW"""
+    display_names = {
         "A": "Ableton Live",
-        "P": "Pro Tools", 
+        "P": "Pro Tools",
         "L": "Logic Pro"
     }
-    return process_names.get(daw_code, "DAW")
+    return display_names.get(daw_code, "DAW")
+
+
+def is_daw_running(daw_code: str, check_bundle: bool = True) -> Tuple[bool, str]:
+    """
+    Check if a DAW process is running.
+    Returns (is_running, process_name)
+    """
+    identifiers = get_daw_process_identifiers(daw_code)
+    names_to_check = identifiers.get("names", [])
+    bundle_ids = identifiers.get("bundle_ids", [])
+    
+    system = platform.system()
+    
+    # On macOS, we can also check via AppleScript for bundle ID
+    if system == "Darwin" and check_bundle:
+        try:
+            for bundle_id in bundle_ids:
+                # Check if app with bundle ID is running
+                result = subprocess.run(
+                    ["osascript", "-e", f'tell application "System Events" to get name of every process whose bundle identifier is "{bundle_id}"'],
+                    capture_output=True, text=True, timeout=2
+                )
+                if result.returncode == 0 and result.stdout.strip():
+                    return True, result.stdout.strip().split(",")[0].strip()
+        except:
+            pass
+    
+    # Check via psutil
+    for proc in psutil.process_iter(['name', 'pid']):
+        try:
+            proc_name = proc.info['name']
+            if proc_name:
+                for name in names_to_check:
+                    if name.lower() in proc_name.lower():
+                        return True, proc_name
+        except (psutil.NoSuchProcess, psutil.AccessDenied):
+            pass
+    
+    return False, ""
 
 
 def wait_for_daw_close(daw_code: str, timeout_minutes: int = 60):
     """
     Wait for the DAW process to close with a live spinner display.
-    Polls for the DAW process every 3 seconds.
+    Uses multiple detection methods.
     """
-    process_name = get_daw_process_name(daw_code)
+    display_name = get_daw_process_name(daw_code)
+    identifiers = get_daw_process_identifiers(daw_code)
     
     console.print()
     console.print(Panel.fit(
-        f"[bold cyan]{process_name} is Open[/bold cyan]\n\n"
+        f"[bold cyan]{display_name} is Open[/bold cyan]\n\n"
         f"[dim]Work in your DAW. Close it when you're done.[/dim]\n"
         f"[dim]The program will automatically continue.[/dim]",
         style="white"
     ))
     
-    time.sleep(2)
+    # Wait a moment for the DAW to fully launch
+    time.sleep(3)
     
     start_time = time.time()
     max_seconds = timeout_minutes * 60
-    check_interval = 3
+    check_interval = 2
+    found_first = False
+    current_process = ""
     
     with Live(console=console, refresh_per_second=10) as live:
         while True:
-            is_running = False
+            is_running, process_name = is_daw_running(daw_code)
             
-            for proc in psutil.process_iter(['name', 'pid']):
-                try:
-                    proc_name = proc.info['name']
-                    if proc_name and (process_name.lower() in proc_name.lower()):
-                        is_running = True
-                        break
-                except (psutil.NoSuchProcess, psutil.AccessDenied):
-                    pass
-            
-            if not is_running:
-                live.update("[bold green]DAW closed! Continuing...[/bold green]")
-                break
+            if is_running:
+                found_first = True
+                current_process = process_name
+            else:
+                # If we found it before and now it's gone, DAW closed
+                if found_first:
+                    live.update("[bold green]DAW closed! Continuing...[/bold green]")
+                    break
+                # If we haven't found it yet, wait longer (still launching)
+                else:
+                    time.sleep(1)
+                    continue
             
             elapsed = int(time.time() - start_time)
             minutes = elapsed // 60
@@ -78,8 +144,9 @@ def wait_for_daw_close(daw_code: str, timeout_minutes: int = 60):
             spinner = spinner_chars[elapsed % len(spinner_chars)]
             
             live.update(
-                f"[yellow]{spinner}[/yellow] Waiting for {process_name} to close... "
+                f"[yellow]{spinner}[/yellow] Waiting for {display_name} to close... "
                 f"[dim]({minutes:02d}:{seconds:02d} elapsed)[/dim]\n"
+                f"[dim]Detected: {current_process}[/dim]\n"
                 f"[dim]Press Ctrl+C to stop waiting and continue[/dim]"
             )
             
@@ -221,7 +288,7 @@ class ProjectOpener:
         daw_path = self.config.get_daw_path(daw_code)
         
         if not daw_path:
-            print_warning(f"DAW ({DAW_MAP.get(daw_code, daw_code)}) not configured.")
+            print_warning(f"DAW ({get_daw_process_name(daw_code)}) not configured.")
             print_info("Let's set it up now.")
             from ..features.daw_setup import run_daw_setup_wizard
             run_daw_setup_wizard(self.config)
@@ -236,7 +303,7 @@ class ProjectOpener:
             print_info("This might be because the DAW was moved, updated, or uninstalled.")
             
             if get_confirmation("\nWould you like to update the path?"):
-                daw_name = DAW_MAP.get(daw_code, daw_code)
+                daw_name = get_daw_process_name(daw_code)
                 new_path = get_daw_path_manually(daw_name, self.os_type)
                 
                 if new_path and new_path != "##BACKTRACK##":
@@ -254,7 +321,8 @@ class ProjectOpener:
                 print_info("You can open the session manually from your DAW.")
                 return False
         
-        print_info(f"Opening {DAW_MAP.get(daw_code, daw_code)} with {session_path.name}...")
+        display_name = get_daw_process_name(daw_code)
+        print_info(f"Opening {display_name} with {session_path.name}...")
         
         try:
             if self.os_type == "windows":
@@ -262,7 +330,10 @@ class ProjectOpener:
                 wait_for_daw_close(daw_code)
                 
             elif self.os_type == "mac":
+                # Launch the app using open
                 subprocess.Popen(["open", "-a", daw_path, str(session_path)])
+                # Wait for the app to launch before starting the wait loop
+                time.sleep(4)
                 wait_for_daw_close(daw_code)
                 
             else:
@@ -283,11 +354,7 @@ class ProjectOpener:
         return True
     
     def prompt_for_current_session(self, project_path: Path, opened_session: Dict, history) -> Tuple[Dict, List[Dict]]:
-        """
-        AFTER the DAW session, ask the user which session file is now the current one.
-        Press Enter = select the newest file (most recent)
-        Enter a number = select that specific file
-        """
+        """AFTER the DAW session, ask which session file is now the current one."""
         
         # Get all sessions (refreshed after DAW closed)
         all_sessions = self.get_session_files(project_path)
@@ -296,7 +363,6 @@ class ProjectOpener:
             print_warning("No session files found. Something went wrong.")
             return None, []
         
-        # The newest session (first in the list)
         newest_session = all_sessions[0]
         
         # Show the session file that was opened
@@ -305,7 +371,6 @@ class ProjectOpener:
         console.print(f"  Location: [dim]{opened_session['parent_folder']}[/dim]")
         console.print(f"  Stage: [yellow]{opened_session['stage']}[/yellow]")
         
-        # Check if the opened session still exists
         opened_exists = opened_session['path'].exists()
         if not opened_exists:
             print_warning(f"The session file '{opened_session['name']}' no longer exists.")
@@ -324,15 +389,10 @@ class ProjectOpener:
         for idx, session in enumerate(all_sessions, 1):
             status = ""
             
-            # Check if this is the newest file
             if idx == 1:
                 status = "[bold green]<< NEWEST[/bold green]"
-            
-            # Check if this is the opened session (and not the newest)
             elif session["path"] == opened_session["path"] and opened_exists:
                 status = "[bold cyan]<< OPENED[/bold cyan]"
-            
-            # Check if it's newer than the opened session (but not the newest)
             elif opened_exists and session["last_modified"] > opened_session["last_modified"]:
                 status = "[yellow]NEWER[/yellow]"
             
@@ -347,7 +407,6 @@ class ProjectOpener:
         
         console.print(table)
         
-        # Ask which is the current session now
         console.print("\n[bold]Which session file is now the current one?[/bold]")
         console.print(f"[dim]Press Enter to select the newest file: [green]{newest_session['name']}[/green][/dim]")
         console.print("[dim]Or enter a number to select a specific file.[/dim]")
@@ -356,7 +415,6 @@ class ProjectOpener:
             choice = input("\nSelect current session: ").strip()
             
             if not choice:
-                # Select the newest file
                 selected_session = newest_session
                 print_info(f"Selected newest file: {selected_session['name']}")
                 break
@@ -371,9 +429,8 @@ class ProjectOpener:
             else:
                 print_error("Invalid input. Enter a number or press Enter for the newest file.")
         
-        # Now ask if any other sessions were affected (optional)
-        affected = [selected_session]  # Always include the current one
-        
+        # Ask if any other sessions were affected
+        affected = [selected_session]
         other_sessions = [s for s in all_sessions if s["path"] != selected_session["path"]]
         
         if other_sessions:
@@ -417,7 +474,6 @@ class ProjectOpener:
                     print_error("Please enter numbers separated by spaces (e.g., '1 3 5')")
                     continue
         
-        # Show summary
         console.print("\n[bold]Session Tracking Summary:[/bold]")
         console.print(f"  Current Session: [green]{selected_session['name']}[/green]")
         if len(affected) > 1:
@@ -498,17 +554,14 @@ class ProjectOpener:
             else:
                 print_error("Invalid input. Enter a number, press Enter for most recent, or 'b' to go back.")
         
-        # Store the opened session path for tracking
         opened_session = selected
         
-        # Open the session and wait for it to close
         success = self.open_session(selected["path"], selected["daw_code"])
         
         if not success:
             print_error("Failed to open DAW session.")
             return None, None
         
-        # AFTER the DAW closes, ask which session is now current
         current_session, affected_sessions = self.prompt_for_current_session(
             project_path, opened_session, history
         )
@@ -526,7 +579,7 @@ class ProjectOpener:
             print_warning("\nNo projects found.")
             print_info("Create a new project first.")
             input("\nPress Enter to continue...")
-            return
+            return None, None
         
         console.print("\n[bold]Projects:[/bold]")
         table = Table(style="white")

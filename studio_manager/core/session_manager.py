@@ -13,7 +13,7 @@ TEMPLATES_BASE = Path.cwd() / "templates"
 def get_template_path(daw: str) -> Path:
     """Get the template path for a given DAW"""
     if daw == "A" or daw == "Ableton":
-        return TEMPLATES_BASE / "ableton templates" / "ableton template.als"
+        return TEMPLATES_BASE / "ableton templates" / "ableton template Project" / "ableton template.als"
     elif daw == "P" or daw == "Pro Tools":
         return TEMPLATES_BASE / "protools templates" / "protools template.ptx"
     elif daw == "L" or daw == "Logic":
