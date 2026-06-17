@@ -11,11 +11,11 @@ TEMPLATES_BASE = Path.cwd() / "templates"
 
 def get_template_path(daw: str) -> Path:
     """Get the template path for a given DAW"""
-    if daw == "A":
+    if daw == "A" or daw == "Ableton":
         return TEMPLATES_BASE / "ableton templates" / "ableton template.als"
-    elif daw == "P":
+    elif daw == "P" or daw == "Pro Tools":
         return TEMPLATES_BASE / "protools templates" / "protools template.ptx"
-    elif daw == "L":
+    elif daw == "L" or daw == "Logic":
         return TEMPLATES_BASE / "logic templates" / "logic template.logicx"
     return None
 
@@ -43,21 +43,37 @@ def create_session_from_template(name: str, artist: str, daw: str, stage: str = 
         if not check_templates():
             return False
         
-        daw_info = DAW_PATHS.get(daw, {})
-        daw_folder = daw_info.get("folder", "")
-        template_path = get_template_path(daw)
+        # Map single letter to full name for DAW_PATHS lookup
+        daw_code_map = {"A": "Ableton", "P": "Pro Tools", "L": "Logic"}
+        daw_name = daw_code_map.get(daw, daw)
         
-        if not template_path:
-            print_error(f"No template found for DAW: {daw}")
+        # Get DAW info
+        daw_info = DAW_PATHS.get(daw, {})
+        if not daw_info:
+            print_error(f"Unknown DAW: {daw}")
             return False
         
-        # Create session inside the stage folder (production/mix/master)
+        daw_folder = daw_info.get("folder", "")
+        if not daw_folder:
+            print_error(f"No folder defined for DAW: {daw}")
+            return False
+        
+        template_path = get_template_path(daw)
+        if not template_path or not template_path.exists():
+            print_error(f"Template not found for DAW: {daw}")
+            return False
+        
+        # Create session inside the stage folder
         session_dir = Path.cwd() / "artists" / artist / name / stage / daw_folder
         session_dir.mkdir(parents=True, exist_ok=True)
         
+        # Create session filename with stage info
+        ext = daw_info.get("ext", "")
+        session_filename = f"{name}_{stage}_session{ext}"
+        destination = session_dir / session_filename
+        
         with Progress(SpinnerColumn(), TextColumn("[progress.description]{task.description}"), console=console, transient=True) as progress:
             task = progress.add_task(f"[white]Copying {daw_folder} template to {stage} folder...", total=None)
-            destination = session_dir / f"{name}_{stage}_session{daw_info.get('ext', '')}"
             shutil.copy2(template_path, destination)
             progress.update(task, completed=True)
         

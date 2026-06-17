@@ -3,18 +3,18 @@ from pathlib import Path
 from datetime import datetime
 from rich.panel import Panel
 from rich.table import Table
-from rich import print as rprint
 from ..cli.display import clear_screen, console, print_success, print_error, print_warning, print_info, print_separator
-from ..cli.prompts import get_confirmation, get_text_input
+from ..cli.prompts import get_confirmation
 from .project_tracker import ProjectTracker, AlbumManager
 from .daw_integration import open_daw_project
 from .session_memo import prompt_for_session_memo
-from .project_flows import manage_project_stage_flow
 from .backup_flows import backup_project_flow
-from ..utils.helpers import list_all_projects, get_project_path
+from ..utils.helpers import list_all_projects
 
 def show_song_project_details(selected: dict, history):
     """Show details for a song project"""
+    from .project_flows import manage_project_stage_flow  # Move import to top of function
+    
     clear_screen()
     console.print(Panel.fit("[bold white]Project Details[/bold white]", style="white"))
     console.print(f"\n  Project: [green]{selected['project']}[/green]")
@@ -67,7 +67,6 @@ def show_song_project_details(selected: dict, history):
                     console.print(f"  Current Stage: [cyan]{tracker.get_current_stage()}[/cyan]")
                     
                     if get_confirmation("\nUpdate project stage after this session?"):
-                        from .project_flows import manage_project_stage_flow
                         manage_project_stage_flow(project_path)
                     
                     prompt_for_session_memo(project_path, history)
