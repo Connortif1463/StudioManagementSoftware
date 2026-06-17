@@ -4,6 +4,7 @@ import subprocess
 import platform
 from pathlib import Path
 from ..cli.display import print_success, print_warning, print_info, print_error
+from ..utils.constants import DAW_PATHS
 
 def get_daw_info(daw_code: str) -> dict:
     """Get DAW information by code"""
