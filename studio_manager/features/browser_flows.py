@@ -6,14 +6,17 @@ from rich.table import Table
 from ..cli.display import clear_screen, console, print_success, print_error, print_warning, print_info, print_separator
 from ..cli.prompts import get_confirmation
 from .project_tracker import ProjectTracker, AlbumManager
-from .daw_integration import open_daw_project
+from .open_project import ProjectOpener  # Changed from daw_integration
 from .session_memo import prompt_for_session_memo
 from .backup_flows import backup_project_flow
 from ..utils.helpers import list_all_projects
 
+
 def show_song_project_details(selected: dict, history):
     """Show details for a song project"""
-    from .project_flows import manage_project_stage_flow  # Move import to top of function
+    from .project_flows import manage_project_stage_flow
+    from .open_project import ProjectOpener
+    from .session_memo import prompt_for_session_memo
     
     clear_screen()
     console.print(Panel.fit("[bold white]Project Details[/bold white]", style="white"))
@@ -28,13 +31,13 @@ def show_song_project_details(selected: dict, history):
     if tracker.data.get("release_date"):
         console.print(f"  Expected Release: [yellow]{tracker.data['release_date'][:10]}[/yellow]")
     
-    # Check if project is in an album
     album_path = tracker.data.get("album")
     if album_path:
         album_name = Path(album_path).name
         console.print(f"  Album: [magenta]{album_name}[/magenta]")
     
     project_path = selected["path"]
+    
     daw_found = None
     for daw_code, daw_info in {"A": "ableton", "P": "protools", "L": "logic"}.items():
         for stage in ["production", "mix", "master"]:
@@ -57,10 +60,11 @@ def show_song_project_details(selected: dict, history):
     if action == "1":
         if daw_found:
             try:
-                result = open_daw_project(project_path, daw_found, selected['project'])
-                if result:
-                    print_info("\nDAW session closed.")
-                    
+                opener = ProjectOpener()
+                selected_session, affected_sessions = opener.open_project_interactive(project_path, history)
+                
+                # Only proceed if we got a valid session back
+                if selected_session:
                     print_separator()
                     console.print("[bold]Session Complete![/bold]")
                     console.print(f"  Project: [green]{selected['project']}[/green]")
@@ -69,11 +73,12 @@ def show_song_project_details(selected: dict, history):
                     if get_confirmation("\nUpdate project stage after this session?"):
                         manage_project_stage_flow(project_path)
                     
-                    prompt_for_session_memo(project_path, history)
+                    # Pass the session data to the memo prompt
+                    prompt_for_session_memo(project_path, history, is_manual=False, 
+                                          selected_session=selected_session, 
+                                          affected_sessions=affected_sessions)
                 else:
-                    print_warning("DAW session did not open. You can still record session notes.")
-                    if get_confirmation("Record session notes anyway?"):
-                        prompt_for_session_memo(project_path, history, is_manual=True)
+                    print_warning("No session was opened.")
             except Exception as e:
                 print_error(f"Failed to open DAW: {e}")
                 print_info("You can still record session notes manually.")
@@ -99,6 +104,7 @@ def show_song_project_details(selected: dict, history):
     else:
         print_error("Invalid option")
         input("\nPress Enter to continue...")
+
 
 def show_album_contents(album_path: Path):
     """Display the contents of an album (its songs)"""
@@ -128,6 +134,7 @@ def show_album_contents(album_path: Path):
         console.print("  1 - Add songs to album")
         console.print("  2 - Remove song from album")
         console.print("  3 - Reorder songs")
+        console.print("  4 - Open a song from the album")
         console.print("  b - Go back")
         
         action = input("\nSelect option: ").strip()
@@ -148,6 +155,15 @@ def show_album_contents(album_path: Path):
                 song_path = Path(manager.data["songs"][song_idx]["path"])
                 manager.reorder_song(song_path, new_pos)
                 show_album_contents(album_path)
+        elif action == "4":
+            # Open a song from the album
+            song_idx = int(input(f"Select song to open (1-{len(manager.data['songs'])}): ")) - 1
+            if 0 <= song_idx < len(manager.data["songs"]):
+                song_path = Path(manager.data["songs"][song_idx]["path"])
+                opener = ProjectOpener()
+                opener.open_project_interactive(song_path)
+                show_album_contents(album_path)  # Refresh after returning
+
 
 def search_and_open_flow(history):
     """Search for projects and open them - main browser functionality"""
@@ -291,7 +307,6 @@ def search_and_open_flow(history):
         return
     
     # Display results
-    from rich.table import Table
     table = Table(title=f"Search Results: {len(results)} project(s) found", style="white")
     table.add_column("#", style="cyan", width=4)
     table.add_column("Project", style="green")
@@ -325,6 +340,7 @@ def search_and_open_flow(history):
     
     input("\nPress Enter to continue...")
 
+
 def project_browser_flow(history):
     """Project Browser - simple search and open interface"""
     clear_screen()
@@ -333,6 +349,7 @@ def project_browser_flow(history):
     console.print("\n[bold]What would you like to do?[/bold]\n")
     console.print("  [cyan]1[/cyan] - Search for a project")
     console.print("  [cyan]2[/cyan] - View finished projects")
+    console.print("  [cyan]3[/cyan] - Browse all projects")
     console.print("  [cyan]b[/cyan] - Go back")
     
     choice = input("\nSelect option: ").strip().lower()
@@ -348,6 +365,12 @@ def project_browser_flow(history):
         from .tasks_flows import view_finished_projects_flow
         view_finished_projects_flow()
         # After viewing finished projects, return to project browser
+        project_browser_flow(history)
+        return
+    elif choice == "3":
+        # Browse all projects using ProjectOpener
+        opener = ProjectOpener()
+        opener.open_from_browser()
         project_browser_flow(history)
         return
     else:

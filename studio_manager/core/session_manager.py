@@ -1,3 +1,4 @@
+import traceback
 import logging
 import shutil
 from pathlib import Path
@@ -43,12 +44,8 @@ def create_session_from_template(name: str, artist: str, daw: str, stage: str = 
         if not check_templates():
             return False
         
-        # Map single letter to full name for DAW_PATHS lookup
-        daw_code_map = {"A": "Ableton", "P": "Pro Tools", "L": "Logic"}
-        daw_name = daw_code_map.get(daw, daw)
-        
-        # Get DAW info
-        daw_info = DAW_PATHS.get(daw, {})
+        # Get DAW info using the letter code directly
+        daw_info = DAW_PATHS.get(daw, {})  # daw is "A", "P", or "L"
         if not daw_info:
             print_error(f"Unknown DAW: {daw}")
             return False
@@ -58,7 +55,7 @@ def create_session_from_template(name: str, artist: str, daw: str, stage: str = 
             print_error(f"No folder defined for DAW: {daw}")
             return False
         
-        template_path = get_template_path(daw)
+        template_path = get_template_path(daw)  # This can handle "A" or "Ableton"
         if not template_path or not template_path.exists():
             print_error(f"Template not found for DAW: {daw}")
             return False
@@ -84,4 +81,5 @@ def create_session_from_template(name: str, artist: str, daw: str, stage: str = 
     except Exception as e:
         logging.error(f"Failed to create session: {e}")
         print_error(f"Error creating session: {e}")
+        traceback.print_exc()
         return False

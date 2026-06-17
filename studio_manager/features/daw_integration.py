@@ -1,8 +1,9 @@
+# studio_manager/features/daw_integration.py
+
 import subprocess
 import platform
 from pathlib import Path
-from ..cli.display import print_success, print_warning, print_info
-from ..utils.constants import DAW_PATHS
+from ..cli.display import print_success, print_warning, print_info, print_error
 
 def get_daw_info(daw_code: str) -> dict:
     """Get DAW information by code"""
@@ -44,13 +45,15 @@ def open_daw_project(project_path: Path, daw_code: str, project_name: str) -> bo
         app_path = daw_info.get("mac")
         if app_path:
             print_info(f"Opening {daw_info['name']} with {session_file.name}...")
-            subprocess.run(["open", "-a", app_path, str(session_file)])
+            # FIX: Use Popen instead of run (non-blocking)
+            subprocess.Popen(["open", "-a", app_path, str(session_file)])
             return True
-    elif system == "Windows": # windows
+    elif system == "Windows":
         exe_path = daw_info.get("win")
         if exe_path:
             print_info(f"Opening {daw_info['name']} with {session_file.name}...")
-            subprocess.run([exe_path, str(session_file)])
+            # FIX: Use Popen with shell=True (non-blocking)
+            subprocess.Popen([exe_path, str(session_file)], shell=True)
             return True
     
     print_warning(f"Auto-open not configured for {daw_info['name']} on {system}")

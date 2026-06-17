@@ -1,4 +1,5 @@
 """Project creation and management flows"""
+import traceback
 from pathlib import Path
 from rich.panel import Panel
 from ..cli.display import clear_screen, console, print_success, print_error, print_warning, print_info
@@ -7,8 +8,7 @@ from ..core.project_manager import create_project
 from .project_tracker import ProjectTracker
 from ..utils.helpers import get_project_path
 from ..utils.constants import DAW_MAP
-
-# Note: get_input_with_completion and get_number_input are now in cli/prompts.py
+from .open_project import ProjectOpener
 
 def get_engineers(history):
     """Get engineer names with validation and backtracking"""
@@ -178,4 +178,5 @@ def new_project_flow(history):
         input("\nPress Enter to continue...")
     except Exception as e:
         print_error(f"\nAn unexpected error occurred: {e}")
+        traceback.print_exc()
         input("\nPress Enter to continue...")

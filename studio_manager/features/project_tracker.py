@@ -16,13 +16,59 @@ class ProjectTracker:
         self.project_path = Path(project_path)
         self.tracker_file = self.project_path / ".project_tracker.json"
         self.data = self.load()
+
+    def ensure_default_fields(self):
+        """Ensure all default fields exist in data"""
+        defaults = {
+            "project_name": self.project_path.name,
+            "project_category": "studio_session",
+            "current_stage": "production",
+            "stage_history": [
+                {
+                    "stage": "production",
+                    "started": datetime.now().isoformat(),
+                    "notes": "Project created"
+                }
+            ],
+            "files": [],
+            "album": None,
+            "album_position": None,
+            "backups": [],
+            "last_modified": datetime.now().isoformat(),
+            "release_date": None,
+            "priority_score": 0
+        }
+        
+        # Add any missing keys
+        for key, value in defaults.items():
+            if key not in self.data:
+                self.data[key] = value
+        
+        # Ensure stage_history exists
+        if not self.data.get("stage_history"):
+            self.data["stage_history"] = [
+                {
+                    "stage": self.data.get("current_stage", "production"),
+                    "started": datetime.now().isoformat(),
+                    "notes": "Project initialized"
+                }
+            ]
+        
+        return self.data
     
     def load(self) -> Dict:
         """Load project tracking data"""
         if self.tracker_file.exists():
-            with open(self.tracker_file, 'r') as f:
-                return json.load(f)
-        return self.create_default()
+            try:
+                with open(self.tracker_file, 'r') as f:
+                    self.data = json.load(f)
+                    self.ensure_default_fields()
+                    return self.data
+            except (json.JSONDecodeError, KeyError):
+                self.data = self.create_default()
+                return self.data
+        self.data = self.create_default()
+        return self.data
     
     def create_default(self) -> Dict:
         """Create default tracking structure"""
@@ -77,7 +123,7 @@ class ProjectTracker:
     
     def get_current_stage(self) -> str:
         """Get current project stage"""
-        return self.data["current_stage"]
+        return self.data.get("current_stage", "production")
     
     def calculate_priority(self) -> int:
         """Calculate priority score based on stage and release date"""
@@ -361,3 +407,4 @@ class AlbumManager:
                                 unassigned.append(project_dir)
         
         return unassigned
+    

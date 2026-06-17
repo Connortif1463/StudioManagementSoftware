@@ -1,14 +1,20 @@
+# studio_manager/features/tasks_flows.py
+
 """Tasks and projects flow - statistics, memos, finished projects, search"""
 from pathlib import Path
 from datetime import datetime
+from typing import Dict, Optional
 from rich.panel import Panel
 from rich.table import Table
 from ..cli.display import clear_screen, console, print_success, print_error, print_warning, print_info, print_separator, show_statistics_table
 from ..cli.prompts import get_confirmation
 from .project_tracker import ProjectTracker
-from .session_memo import SessionMemo
+from .session_memo import SessionMemo, prompt_for_session_memo
 from ..utils.helpers import get_project_path, list_all_projects
 from .browser_flows import show_song_project_details
+from .open_project import ProjectOpener
+from .project_flows import manage_project_stage_flow
+
 
 def view_project_memos_flow():
     """Flow for viewing memos from a project - excludes finished projects"""
@@ -69,6 +75,7 @@ def view_project_memos_flow():
     
     # If we get here (user pressed b or invalid), return to tasks menu
     return
+
 
 def set_release_date_flow():
     """Flow for setting expected release date on a project - excludes finished projects"""
@@ -149,6 +156,7 @@ def set_release_date_flow():
             print_error("Invalid date format. Please use YYYY-MM-DD (e.g., 2026-04-20)")
             continue
 
+
 def view_finished_projects_flow():
     """View all finished projects"""
     clear_screen()
@@ -222,6 +230,7 @@ def view_finished_projects_flow():
     else:
         # If they don't want to reopen, just return
         return
+
 
 def search_projects_flow():
     """Search for projects by name, artist, or stage"""
@@ -306,6 +315,7 @@ def search_projects_flow():
                     "artist": project["artist"],
                     "path": project["path"]
                 })
+
 
 def filter_by_category_flow(history):
     """Filter active songs by project category and allow actions"""
@@ -407,8 +417,22 @@ def filter_by_category_flow(history):
     
     if action == "1":
         # Open the project
-        from .browser_flows import show_song_project_details
-        show_song_project_details(project, history)
+        opener = ProjectOpener()
+        opener.open_project_interactive(project_path)
+        
+        # After DAW closes, prompt for memo and stage
+        print_separator()
+        console.print("[bold]Session Complete![/bold]")
+        console.print(f"  Project: [green]{project['project']}[/green]")
+        
+        tracker = ProjectTracker(project_path)
+        console.print(f"  Current Stage: [cyan]{tracker.get_current_stage()}[/cyan]")
+        
+        if get_confirmation("\nUpdate project stage after this session?"):
+            manage_project_stage_flow(project_path)
+        
+        prompt_for_session_memo(project_path, history)
+        
     elif action == "2":
         # View memos
         memo = SessionMemo(project_path)
@@ -437,8 +461,11 @@ def filter_by_category_flow(history):
                 continue
         input("\nPress Enter to continue...")
 
+
 def tasks_and_projects_flow(history):
     """Tasks and Projects - view statistics, memos, finished projects, search"""
+    from .open_project import ProjectOpener
+    
     clear_screen()
     console.print(Panel.fit("[bold white]Tasks & Projects[/bold white]", style="white"))
     
@@ -541,8 +568,31 @@ def tasks_and_projects_flow(history):
                 idx = int(proj_choice) - 1
                 if 0 <= idx < len(active_songs):
                     project = active_songs[idx]
-                    from .browser_flows import show_song_project_details
-                    show_song_project_details(project, history)
+                    project_path = project["path"]
+                    
+                    # Open the project
+                    opener = ProjectOpener()
+                    selected_session, affected_sessions = opener.open_project_interactive(project_path, history)
+                    
+                    # Only proceed if we got a valid session back
+                    if selected_session:
+                        print_separator()
+                        console.print("[bold]Session Complete![/bold]")
+                        console.print(f"  Project: [green]{project['project']}[/green]")
+                        
+                        tracker = ProjectTracker(project_path)
+                        console.print(f"  Current Stage: [cyan]{tracker.get_current_stage()}[/cyan]")
+                        
+                        if get_confirmation("\nUpdate project stage after this session?"):
+                            manage_project_stage_flow(project_path)
+                        
+                        # Pass the session data to the memo prompt
+                        prompt_for_session_memo(project_path, history, is_manual=False,
+                                            selected_session=selected_session,
+                                            affected_sessions=affected_sessions)
+                    else:
+                        print_warning("No session was opened.")
+                    
                     tasks_and_projects_flow(history)
                     return
                 else:

@@ -34,8 +34,8 @@ class ProjectHistory:
             "session_stats": {
                 "total_songs": 0,
                 "total_albums": 0,
-                "by_daw": defaultdict(int),
-                "by_artist": defaultdict(int)
+                "by_daw": defaultdict(int),  # <-- Change this
+                "by_artist": defaultdict(int)  # <-- Change this too
             }
         }
     
@@ -71,7 +71,7 @@ class ProjectHistory:
             "weekday": now.strftime("%A"),
             "week_number": now.isocalendar()[1],
             "release_date": release_date,
-            "stage": "production"  # Default stage for new projects
+            "stage": "production"
         }
         
         self.data["projects"].append(project_entry)
@@ -81,11 +81,13 @@ class ProjectHistory:
         if project_type == "S":
             self.data["session_stats"]["total_songs"] += 1
             if daw:
-                self.data["session_stats"]["by_daw"][daw] += 1
+                # Safely increment DAW count
+                self.data["session_stats"]["by_daw"][daw] = self.data["session_stats"]["by_daw"].get(daw, 0) + 1
         else:
             self.data["session_stats"]["total_albums"] += 1
         
-        self.data["session_stats"]["by_artist"][artist] += 1
+        # Safely increment artist count
+        self.data["session_stats"]["by_artist"][artist] = self.data["session_stats"]["by_artist"].get(artist, 0) + 1
         self.save()
     
     def get_completions(self, field: str, query: str) -> List[str]:
