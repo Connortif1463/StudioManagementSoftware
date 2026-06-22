@@ -226,6 +226,50 @@ class ProjectOpener:
         
         return als_files
     
+    def find_ptx_files(self, directory: Path) -> List[Path]:
+        """Recursively find all .ptx files in a directory"""
+        ptx_files = []
+        
+        for root, dirs, files in os.walk(directory):
+            for file in files:
+                if file.endswith('.ptx'):
+                    ptx_files.append(Path(root) / file)
+        
+        return ptx_files
+
+    def find_logicx_files(self, directory: Path) -> List[Path]:
+        """Recursively find all .logicx files in a directory"""
+        logicx_files = []
+        
+        for root, dirs, files in os.walk(directory):
+            for file in files:
+                if file.endswith('.logicx'):
+                    logicx_files.append(Path(root) / file)
+        
+        return logicx_files
+    
+    def find_sesx_files(self, directory: Path) -> List[Path]:
+        """Recursively find all .sesx files in a directory"""
+        sesx_files = []
+        
+        for root, dirs, files in os.walk(directory):
+            for file in files:
+                if file.endswith('.sesx'):
+                    sesx_files.append(Path(root) / file)
+        
+        return sesx_files
+    
+    def find_cpr_files(self, directory: Path) -> List[Path]:
+        """Recursively find all .cpr files in a directory"""
+        cpr_files = []
+        
+        for root, dirs, files in os.walk(directory):
+            for file in files:
+                if file.endswith('.cpr'):
+                    cpr_files.append(Path(root) / file)
+        
+        return cpr_files
+    
     def get_session_files(self, project_path: Path, daw_code: str = None) -> List[Dict]:
         """Find all session files in a project, including those in subfolders.
         Sorted by last modified (most recent first)."""
@@ -245,8 +289,12 @@ class ProjectOpener:
                 session_dir = project_path / stage / daw_folder
                 if session_dir.exists():
                     als_files = self.find_als_files(session_dir)
+                    ptx_files = self.find_ptx_files(session_dir)
+                    logicx_files = self.find_logicx_files(session_dir)
+                    sesx_files = self.find_sesx_files(session_dir)
+                    cpr_files = self.get_cpr_files(session_dir)
                     
-                    for file in als_files:
+                    for file in als_files, ptx_files, logicx_files, sesx_files, cpr_files:
                         ext = file.suffix.lower()
                         daw_code_from_ext = {
                             ".als": "A",
