@@ -292,9 +292,21 @@ class ProjectOpener:
                     ptx_files = self.find_ptx_files(session_dir)
                     logicx_files = self.find_logicx_files(session_dir)
                     sesx_files = self.find_sesx_files(session_dir)
-                    cpr_files = self.get_cpr_files(session_dir)
+                    cpr_files = self.find_cpr_files(session_dir)
+
+                    files = []
+                    for file in als_files:
+                        files.append(file)
+                    for file in ptx_files:
+                        files.append(file)
+                    for file in logicx_files:
+                        files.append(file)
+                    for sesx in sesx_files:
+                        files.append(file)
+                    for cpr in cpr_files:
+                        files.append
                     
-                    for file in als_files, ptx_files, logicx_files, sesx_files, cpr_files:
+                    for file in files:
                         ext = file.suffix.lower()
                         daw_code_from_ext = {
                             ".als": "A",
