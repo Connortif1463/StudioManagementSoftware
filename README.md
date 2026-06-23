@@ -1,7 +1,7 @@
 # Studio Management System
 
 #### Prerequisites
-- Python 3.7 or higher
+- Python 3.7
 
 #### Install from GitHub
 
@@ -16,5 +16,5 @@ pip install -r requirements.txt
 #### Starting the Application
 
 ```bash
-python3 run.py
+python run.py
 ```
