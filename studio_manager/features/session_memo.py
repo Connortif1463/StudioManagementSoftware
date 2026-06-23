@@ -1,7 +1,7 @@
 # studio_manager/features/session_memo.py
 
 import json
-import readline
+import sys
 import os
 from pathlib import Path
 from datetime import datetime
@@ -11,6 +11,44 @@ from rich.table import Table
 from ..cli.display import console, print_header, print_separator, print_success, print_info, print_error, print_warning, print_dim, clear_screen
 from ..cli.prompts import get_text_input, get_choice, get_confirmation
 from ..data.history import ProjectHistory
+
+# Define DummyReadline at the module level FIRST
+class DummyReadline:
+    """Dummy readline class for when no real readline is available"""
+    def set_completer(self, *args, **kwargs): pass
+    def parse_and_bind(self, *args, **kwargs): pass
+    def set_completer_delims(self, *args, **kwargs): pass
+    def get_line_buffer(self, *args, **kwargs): return ""
+    def insert_text(self, *args, **kwargs): pass
+    def redisplay(self, *args, **kwargs): pass
+
+# Try to import readline with proper platform-specific handling
+readline = DummyReadline()
+
+if sys.platform == 'win32':
+    try:
+        import pyreadline3 as readline
+    except ImportError:
+        try:
+            import readline
+        except ImportError:
+            pass
+elif sys.platform == 'darwin':
+    try:
+        import gnureadline as readline
+    except ImportError:
+        try:
+            import readline
+        except ImportError:
+            pass
+else:
+    try:
+        import readline
+    except ImportError:
+        pass
+
+if readline is None:
+    readline = DummyReadline()
 
 # Available roles for tab completion
 AVAILABLE_ROLES = ["Engineer", "Producer", "Artist", "Musician", "Vocalist", "Other"]
@@ -77,13 +115,20 @@ class CustomCompleter:
 
 def setup_completion(options):
     """Setup tab completion with proper cycling"""
-    if options:
-        completer = CustomCompleter(options)
-        readline.set_completer(completer.complete)
-        readline.parse_and_bind("tab: complete")
-        readline.parse_and_bind("set show-all-if-ambiguous on")
-    else:
-        readline.set_completer(None)
+    try:
+        if options and readline:
+            completer = CustomCompleter(options)
+            readline.set_completer(completer.complete)
+            readline.parse_and_bind("tab: complete")
+            readline.parse_and_bind("set show-all-if-ambiguous on")
+            
+            if sys.platform == 'darwin' and hasattr(readline, 'set_completer_delims'):
+                readline.set_completer_delims(" \t\n;")
+        else:
+            if readline and hasattr(readline, 'set_completer'):
+                readline.set_completer(None)
+    except Exception as e:
+        pass
 
 def get_input_with_completion(prompt: str, options: List[str], allow_new: bool = True, allow_empty: bool = False) -> str:
     """Get input with tab completion that cycles through options"""
@@ -234,7 +279,6 @@ class SessionMemo:
         """
         print_header("Session Memo")
         
-        # If no session was provided, we can't continue
         if selected_session is None:
             print_error("No session file provided. Cannot create memo.")
             return None
@@ -250,7 +294,6 @@ class SessionMemo:
             "files_created": []
         }
         
-        # Add the primary session file
         memo["session_files"].append({
             "path": str(selected_session["path"]),
             "name": selected_session["name"],
@@ -260,7 +303,6 @@ class SessionMemo:
             "last_modified": selected_session.get("last_modified_pretty", "")
         })
         
-        # Add any affected sessions
         if affected_sessions:
             for session in affected_sessions:
                 if session["path"] != selected_session["path"]:
@@ -273,15 +315,12 @@ class SessionMemo:
                         "last_modified": session.get("last_modified_pretty", "")
                     })
         
-        # REMOVED: Session files display and confirmation - already done in previous step
-        
-        # Get contributors
         all_names = get_all_names_from_history()
         
         console.print("\n[bold]Who was at this session?[/bold]")
         print_info("Enter names one by one. Press Enter with no name to finish.")
         
-        if all_names:
+        if all_names and not isinstance(readline, DummyReadline):
             print_info(f"Press TAB to cycle through {len(all_names)} names from previous sessions")
         
         while True:
@@ -318,7 +357,6 @@ class SessionMemo:
             print_warning("No contributors added. Skipping memo.")
             return None
         
-        # Get tasks
         console.print("\n[bold]What was accomplished?[/bold]")
         print_info("Enter tasks one by one. Press Enter with no text to finish.")
         while True:
@@ -328,7 +366,6 @@ class SessionMemo:
             memo["tasks_completed"].append(task)
             print_success(f"Added task: {task}")
         
-        # Get notes
         notes = input("\nAdditional notes (or press Enter to skip): ").strip()
         if notes:
             memo["notes"] = notes
@@ -339,7 +376,6 @@ class SessionMemo:
         print_separator()
         print_success("Session memo saved successfully!")
         
-        # Summary
         console.print("\n[bold]Session Summary:[/bold]")
         console.print(f"  Date: [cyan]{memo['date']} at {memo['time']}[/cyan]")
         console.print(f"  Session Files: [green]{len(memo['session_files'])}[/green]")

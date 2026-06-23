@@ -1,6 +1,6 @@
 # studio_manager/features/open_project.py
-
 import os
+import sys
 import subprocess
 import platform
 import time
@@ -20,7 +20,6 @@ from ..utils.daw_discovery import DAWDiscovery
 from ..features.daw_setup import get_daw_path_manually, run_daw_setup_wizard
 from .project_tracker import ProjectTracker
 from ..utils.constants import DAW_MAP, DAW_PATHS
-
 
 def get_daw_process_identifiers(daw_code: str) -> dict:
     """

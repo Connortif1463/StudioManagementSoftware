@@ -1,14 +1,118 @@
+# studio_manager/cli/prompts.py
+
+import sys
 from rich.prompt import Prompt, Confirm
 from rich import print as rprint
-from .display import print_separator, print_dim, print_error, print_info
+from .display import print_separator, print_dim, print_error, print_info, print_warning
+
+# Define DummyReadline at the module level FIRST
+class DummyReadline:
+    """Dummy readline class for when no real readline is available"""
+    def set_completer(self, *args, **kwargs): pass
+    def parse_and_bind(self, *args, **kwargs): pass
+    def set_completer_delims(self, *args, **kwargs): pass
+    def get_line_buffer(self, *args, **kwargs): return ""
+    def insert_text(self, *args, **kwargs): pass
+    def redisplay(self, *args, **kwargs): pass
+
+# Try to import readline with proper platform-specific handling
+readline = DummyReadline()
+
+# On Windows, use pyreadline3 if available
+if sys.platform == 'win32':
+    try:
+        import pyreadline3 as readline
+    except ImportError:
+        try:
+            import readline
+        except ImportError:
+            pass
+# On Mac, try gnureadline first, then built-in
+elif sys.platform == 'darwin':
+    try:
+        import gnureadline as readline
+    except ImportError:
+        try:
+            import readline  # Built-in libedit on macOS
+        except ImportError:
+            pass
+# On Linux, use built-in readline
+else:
+    try:
+        import readline
+    except ImportError:
+        pass
+
+# If we still don't have a real readline, use DummyReadline (already defined above)
+if readline is None:
+    readline = DummyReadline()
+
+# Track which tips have been shown for each field
+_tip_shown = {}
+
+def reset_tip_tracking():
+    """Reset the tip tracking for a new session"""
+    global _tip_shown
+    _tip_shown = {}
+
+
+class CustomCompleter:
+    """Custom completer that cycles through options on tab"""
+    def __init__(self, options):
+        self.options = sorted(set(options))
+        self.matches = []
+        self.index = -1
+        self.last_text = ""
+    
+    def complete(self, text, state):
+        # Check if text has changed from last call
+        if text != self.last_text:
+            self.last_text = text
+            self.index = -1
+            if not text:
+                self.matches = self.options[:]
+            else:
+                self.matches = [opt for opt in self.options if opt.lower().startswith(text.lower())]
+            self.index = -1
+        
+        # Cycle through matches
+        if state == 0:
+            self.index = (self.index + 1) % len(self.matches) if self.matches else -1
+        
+        if state < len(self.matches) and self.index >= 0:
+            return self.matches[self.index]
+        return None
+
+
+def setup_completion(options):
+    """Setup tab completion with proper cycling"""
+    try:
+        if options and readline:
+            completer = CustomCompleter(options)
+            readline.set_completer(completer.complete)
+            readline.parse_and_bind("tab: complete")
+            readline.parse_and_bind("set show-all-if-ambiguous on")
+            
+            # On macOS with libedit, we need to set delimiter
+            if sys.platform == 'darwin' and hasattr(readline, 'set_completer_delims'):
+                readline.set_completer_delims(" \t\n;")
+        else:
+            if readline and hasattr(readline, 'set_completer'):
+                readline.set_completer(None)
+    except Exception as e:
+        # If readline fails, silently continue
+        pass
+
 
 def get_choice(prompt: str, choices: list, default: str = None) -> str:
     """Get a choice from the user"""
     return Prompt.ask(prompt, choices=choices, default=default)
 
+
 def get_confirmation(prompt: str) -> bool:
     """Get yes/no confirmation"""
     return Confirm.ask(prompt)
+
 
 def get_text_input(prompt: str, allow_empty: bool = False, allow_backtrack: bool = True) -> str:
     """Get text input with backtrack support"""
@@ -22,6 +126,7 @@ def get_text_input(prompt: str, allow_empty: bool = False, allow_backtrack: bool
         return get_text_input(prompt, allow_empty, allow_backtrack)
     
     return user_input
+
 
 def get_number_input(prompt: str, min_val: int = None, max_val: int = None, allow_backtrack: bool = True):
     """Get numeric input with validation"""
@@ -46,16 +151,56 @@ def get_number_input(prompt: str, min_val: int = None, max_val: int = None, allo
     
     return num
 
+
 def get_input_with_completion(prompt: str, field: str, history_obj, allow_backtrack: bool = True) -> str:
-    """Get user input with tab completion, suggestions, and backtracking"""
-    import readline
-    from ..data.history import ProjectHistory
+    """
+    Get user input with tab completion from history data.
+    Supports cycling through options with TAB.
+    """
+    global _tip_shown
     
-    # This is a simplified version - the full version needs the Completer class
-    # For now, just get regular input
+    # Get candidates from history
+    candidates = []
+    if field == "artist":
+        candidates = list(history_obj.data.get("artists", set()))
+    elif field == "engineer":
+        candidates = list(history_obj.data.get("engineers", set()))
+    else:
+        # Generic field - try to get from data
+        candidates = list(history_obj.data.get(f"{field}s", []))
+    
+    # Also add all names from projects
+    if field in ["artist", "engineer"]:
+        for project in history_obj.data.get("projects", []):
+            if field == "artist" and project.get("artist"):
+                candidates.append(project.get("artist"))
+            elif field == "engineer":
+                for eng in project.get("engineers", []):
+                    if eng:
+                        candidates.append(eng)
+    
+    # Remove duplicates and sort
+    candidates = sorted(set(candidates))
+    
+    # Setup tab completion with candidates
+    setup_completion(candidates)
+    
+    # Show tip only ONCE per field per session
+    is_real_readline = not isinstance(readline, DummyReadline)
+    
+    # Only show the hint if:
+    # 1. There are candidates
+    # 2. We have a real readline
+    # 3. We haven't shown the tip for this field yet in this session
+    if candidates and is_real_readline and not _tip_shown.get(field, False):
+        field_display = field.capitalize()
+        print_info(f"\nTip: Press TAB to autocomplete {field_display} names from history")
+        _tip_shown[field] = True  # Mark as shown
+    
     while True:
         user_input = input(f"{prompt}: ").strip()
         
+        # Check for backtrack
         if allow_backtrack and user_input.lower() in ['b', 'back', 'backtrack', '..']:
             return "##BACKTRACK##"
         
@@ -63,4 +208,10 @@ def get_input_with_completion(prompt: str, field: str, history_obj, allow_backtr
             print_error("Input cannot be empty. Please try again.")
             continue
         
+        # If there's a match in candidates, return the matched version (preserves case)
+        for candidate in candidates:
+            if candidate.lower() == user_input.lower():
+                return candidate
+        
+        # If no match, return the user's input as-is (allows new entries)
         return user_input

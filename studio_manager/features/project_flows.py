@@ -10,6 +10,7 @@ from ..utils.helpers import get_project_path
 from ..utils.constants import DAW_MAP
 from .open_project import ProjectOpener
 
+
 def get_engineers(history):
     """Get engineer names with validation and backtracking"""
     engineers = []
@@ -22,7 +23,13 @@ def get_engineers(history):
         
         for i in range(num_input):
             while True:
-                engineer = get_text_input(f"\nEnter the name of engineer #{i+1}", allow_empty=False, allow_backtrack=True)
+                # Use get_input_with_completion for engineer names (with tab completion from history)
+                engineer = get_input_with_completion(
+                    f"\nEnter the name of engineer #{i+1}", 
+                    "engineer",
+                    history, 
+                    allow_backtrack=True
+                )
                 
                 if engineer == "##BACKTRACK##":
                     if i > 0:
@@ -43,6 +50,7 @@ def get_engineers(history):
         if engineers:
             return engineers
 
+
 def get_project_name():
     """Get project name with backtracking"""
     while True:
@@ -51,13 +59,16 @@ def get_project_name():
             return "##BACKTRACK##"
         return name
 
+
 def get_project_type():
     """Get and validate project type with backtracking"""
     return get_choice("\nEnter S for Song, or A for Album", ["S", "A"])
 
+
 def get_daw():
     """Get and validate DAW selection with backtracking"""
     return get_choice("\nEnter the DAW you're using (P for Pro Tools, A for Ableton, L for Logic)", ["P", "A", "L"])
+
 
 def get_project_category():
     """Get project category from user"""
@@ -81,6 +92,7 @@ def get_project_category():
         return "##BACKTRACK##"
     return category_map.get(category_choice, "studio_session")
 
+
 def manage_project_stage_flow(project_path: Path):
     """Manage the stage of a project"""
     clear_screen()
@@ -103,6 +115,7 @@ def manage_project_stage_flow(project_path: Path):
                 tracker.update_stage(new_stage, notes)
                 input("\nPress Enter to continue...")
 
+
 def new_project_flow(history):
     """Handle new project creation flow with backtracking support"""
     clear_screen()
@@ -122,8 +135,7 @@ def new_project_flow(history):
         if project_type == "##BACKTRACK##":
             return
         
-        if len(history.data["artists"]) > 0:
-            print_info("\nTip: Press TAB to see available artists from history")
+        # Use get_input_with_completion for artist names (with tab completion from history)
         artist = get_input_with_completion("\nEnter the name of the artist", "artist", history, allow_backtrack=True)
         if artist == "##BACKTRACK##":
             return
@@ -164,6 +176,11 @@ def new_project_flow(history):
                     if tracker.get_current_stage() == "production" and not tracker.data.get("stage_history"):
                         tracker.data["current_stage"] = "production"
                         tracker.save()
+                    
+                    # Ask if user wants to open the project
+                    if get_confirmation("\nOpen the project now?"):
+                        opener = ProjectOpener()
+                        opener.open_project_interactive(project_path, history)
                 
                 input("\nPress Enter to continue...")
             else:
