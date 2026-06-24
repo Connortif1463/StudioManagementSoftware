@@ -1,4 +1,7 @@
+# studio_manager/main.py
+
 import sys
+import traceback
 import readline
 from pathlib import Path
 from rich.panel import Panel
@@ -21,6 +24,9 @@ history = ProjectHistory()
 session_logger = SessionLogger()
 set_history(history)
 set_album_history(history)
+
+# Store logger in history for error logging
+history.logger = session_logger
 
 def main():
     """Main program entry point"""
@@ -69,9 +75,11 @@ def main():
             print_warning("\nEXITED.")
             sys.exit(0)
         except Exception as e:
-            session_logger.log_action("APPLICATION_ERROR", f"Error: {str(e)}")
+            # Log the full error with traceback
+            error_details = session_logger.log_error(e, "Main loop")
             session_logger.save_session()
             print_error(f"\nAn unexpected error occurred: {e}")
+            print_info(f"Check session log for details: session_logs/")
             input("\nPress Enter to continue...")
 
 if __name__ == "__main__":

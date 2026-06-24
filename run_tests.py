@@ -1,65 +1,37 @@
-#!/usr/bin/env python3
-"""
-Test Runner for Studio Management System
-Run this file from the root directory to test all features
-"""
+# run_tests.py
 
 import sys
 import os
 from pathlib import Path
 
-# Add the current directory to path
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+# Ensure the project root is in the Python path
+project_root = Path(__file__).parent
+sys.path.insert(0, str(project_root))
+
+# Change to the project root so templates can be found
+os.chdir(project_root)
+
+# Now import and run tests
+from tests.test_all import run_all_tests
 
 if __name__ == "__main__":
     print("=" * 60)
     print("STUDIO MANAGEMENT SYSTEM - TEST SUITE")
     print("=" * 60)
-    print("\nRunning all tests...\n")
+    print()
+    print(f"Working directory: {Path.cwd()}")
+    print(f"Templates directory: {Path.cwd() / 'templates'}")
+    print()
     
-    from tests.test_cli import run_cli_tests
-    from tests.test_core import run_core_tests
-    from tests.test_features import run_features_tests
-    from tests.test_data import run_data_tests
-    from tests.test_integration import run_integration_tests
-    from tests.test_stage_migration import run_stage_migration_tests
+    # Show which DAWs are enabled
+    try:
+        from tests.test_core import TEST_DAWS
+        print("DAWs enabled for testing:")
+        for daw, enabled in TEST_DAWS.items():
+            status = "✅" if enabled else "❌ (skipped)"
+            print(f"  {status} {daw}")
+        print()
+    except ImportError:
+        pass
     
-    results = []
-    
-    print("\n[1/6] Testing CLI modules...")
-    results.append(("CLI", run_cli_tests()))
-    
-    print("\n[2/6] Testing Core modules...")
-    results.append(("Core", run_core_tests()))
-    
-    print("\n[3/6] Testing Features modules...")
-    results.append(("Features", run_features_tests()))
-    
-    print("\n[4/6] Testing Data modules...")
-    results.append(("Data", run_data_tests()))
-    
-    print("\n[5/6] Testing Integration...")
-    results.append(("Integration", run_integration_tests()))
-    
-    print("\n[6/6] Testing Stage Migration...")
-    results.append(("Stage Migration", run_stage_migration_tests()))
-    
-    # Summary
-    print("\n" + "=" * 60)
-    print("TEST SUMMARY")
-    print("=" * 60)
-    
-    total_tests = 0
-    total_passed = 0
-    total_failed = 0
-    
-    for module_name, (passed, failed, errors) in results:
-        total_tests += passed + failed + errors
-        total_passed += passed
-        total_failed += failed + errors
-        status = "✅" if failed == 0 and errors == 0 else "❌"
-        print(f"{status} {module_name}: {passed} passed, {failed} failed, {errors} errors")
-    
-    print("-" * 60)
-    print(f"Total: {total_passed} passed, {total_failed} failed out of {total_tests} tests")
-    print("=" * 60)
+    run_all_tests()

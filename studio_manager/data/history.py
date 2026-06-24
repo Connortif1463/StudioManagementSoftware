@@ -1,9 +1,12 @@
+# studio_manager/data/history.py
+
 import json
 from pathlib import Path
 from datetime import datetime
 from typing import List, Dict
 from collections import defaultdict
 from difflib import get_close_matches
+
 
 class ProjectHistory:
     """Manages project history ledger"""
@@ -34,8 +37,8 @@ class ProjectHistory:
             "session_stats": {
                 "total_songs": 0,
                 "total_albums": 0,
-                "by_daw": defaultdict(int),  # <-- Change this
-                "by_artist": defaultdict(int)  # <-- Change this too
+                "by_daw": defaultdict(int),
+                "by_artist": defaultdict(int)
             }
         }
     
@@ -76,7 +79,10 @@ class ProjectHistory:
         
         self.data["projects"].append(project_entry)
         self.data["artists"].add(artist)
-        self.data["engineers"].update(engineers)
+        
+        # IMPORTANT: Add engineers to the engineers set for autocomplete
+        if engineers:
+            self.data["engineers"].update(engineers)
         
         if project_type == "S":
             self.data["session_stats"]["total_songs"] += 1
@@ -122,7 +128,6 @@ class ProjectHistory:
         """Get formatted statistics - scans filesystem for accurate album counts"""
         # Get stats from history
         total_songs = self.data["session_stats"]["total_songs"]
-        total_albums_from_history = self.data["session_stats"]["total_albums"]
         unique_artists = len(self.data["artists"])
         unique_engineers = len(self.data["engineers"])
         

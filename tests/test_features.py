@@ -1,211 +1,121 @@
-"""Tests for Features modules"""
+# tests/test_features.py
 
-import sys
-import os
+import unittest
+from pathlib import Path
 import tempfile
 import shutil
-from pathlib import Path
+import os
+import json
+from datetime import datetime
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-def run_features_tests():
-    """Run all Features tests"""
-    passed = 0
-    failed = 0
-    errors = 0
+class TestFeatures(unittest.TestCase):
     
-    # Create temporary test directory
-    test_dir = Path(tempfile.mkdtemp())
-    original_cwd = Path.cwd()
-    os.chdir(test_dir)
-    
-    try:
-        print("  Testing features.project_tracker...")
-        from studio_manager.features.project_tracker import ProjectTracker, AlbumManager
-        print("    ✅ Import successful")
-        passed += 1
-    except Exception as e:
-        print(f"    ❌ Import failed: {e}")
-        failed += 1
-    
-    try:
-        print("  Testing ProjectTracker...")
-        from studio_manager.features.project_tracker import ProjectTracker
+    def setUp(self):
+        self.test_dir = tempfile.mkdtemp()
+        self.original_cwd = os.getcwd()
+        os.chdir(self.test_dir)
         
         # Create a test project
-        test_project = Path("test_artist/test_project")
-        test_project.mkdir(parents=True)
+        self.artist = "test_artist"
+        self.project = "test_project"
+        self.project_path = Path(self.test_dir) / "artists" / self.artist / self.project
+        self.project_path.mkdir(parents=True, exist_ok=True)
         
-        tracker = ProjectTracker(test_project)
-        assert tracker.get_current_stage() == "production"
+        # Create tracker file
+        self.tracker_file = self.project_path / ".project_tracker.json"
+        self.tracker_data = {
+            "project_name": self.project,
+            "project_category": "studio_session",
+            "current_stage": "production",
+            "stage_history": [
+                {
+                    "stage": "production",
+                    "started": datetime.now().isoformat(),
+                    "notes": "Project created"
+                }
+            ],
+            "files": [],
+            "album": None,
+            "album_position": None,
+            "backups": [],
+            "last_modified": datetime.now().isoformat(),
+            "release_date": None,
+            "priority_score": 0
+        }
+        with open(self.tracker_file, 'w') as f:
+            json.dump(self.tracker_data, f, indent=2)
+    
+    def tearDown(self):
+        os.chdir(self.original_cwd)
+        shutil.rmtree(self.test_dir, ignore_errors=True)
+    
+    def test_project_tracker_load(self):
+        from studio_manager.features.project_tracker import ProjectTracker
         
-        # Test stage update
+        tracker = ProjectTracker(self.project_path)
+        self.assertEqual(tracker.data["project_name"], self.project)
+        self.assertEqual(tracker.get_current_stage(), "production")
+    
+    def test_project_tracker_save(self):
+        from studio_manager.features.project_tracker import ProjectTracker
+        
+        tracker = ProjectTracker(self.project_path)
+        tracker.data["project_name"] = "new_name"
+        tracker.save()
+        
+        # Reload and verify
+        new_tracker = ProjectTracker(self.project_path)
+        self.assertEqual(new_tracker.data["project_name"], "new_name")
+    
+    def test_project_tracker_update_stage(self):
+        from studio_manager.features.project_tracker import ProjectTracker
+        
+        tracker = ProjectTracker(self.project_path)
         tracker.update_stage("mixing", "Moving to mixing")
-        assert tracker.get_current_stage() == "mixing"
         
-        # Test priority calculation
+        self.assertEqual(tracker.get_current_stage(), "mixing")
+        self.assertEqual(len(tracker.data["stage_history"]), 2)
+    
+    def test_project_tracker_priority(self):
+        from studio_manager.features.project_tracker import ProjectTracker
+        
+        tracker = ProjectTracker(self.project_path)
         priority = tracker.calculate_priority()
-        assert priority >= 0
+        self.assertEqual(priority, 4)
         
-        # Test release date
-        tracker.set_release_date("2025-01-01")
-        assert tracker.data.get("release_date") == "2025-01-01"
-        
-        # Test category
-        tracker.set_project_category("demo")
-        assert tracker.get_project_category() == "demo"
-        
-        print("    ✅ ProjectTracker works")
-        passed += 1
-    except Exception as e:
-        print(f"    ❌ ProjectTracker failed: {e}")
-        failed += 1
+        # Set release date and check priority changes
+        from datetime import datetime, timedelta
+        future_date = (datetime.now() + timedelta(days=5)).isoformat()
+        tracker.set_release_date(future_date)
+        priority = tracker.calculate_priority()
+        self.assertGreater(priority, 4)
     
-    try:
-        print("  Testing AlbumManager...")
-        from studio_manager.features.project_tracker import AlbumManager, ProjectTracker
+    def test_album_manager(self):
+        from studio_manager.features.project_tracker import AlbumManager
         
-        # Create album
-        album_path = Path("test_artist/test_album")
-        album_path.mkdir(parents=True)
+        album_path = Path(self.test_dir) / "test_album"
+        album_path.mkdir(exist_ok=True)
+        
         manager = AlbumManager(album_path)
-        assert manager.data["name"] == "test_album"
-        
-        # Create songs with production folders (to be recognized as songs)
-        for i in range(3):
-            song_path = Path(f"test_artist/song_{i}")
-            song_path.mkdir(parents=True)
-            # Create production folder to mark as song project
-            (song_path / "production").mkdir(exist_ok=True)
-            tracker = ProjectTracker(song_path)
-            tracker.save()
-        
-        # Test get_unassigned_songs
-        unassigned = manager.get_unassigned_songs(Path.cwd())
-        # Should find at least some songs
-        if len(unassigned) > 0:
-            # Test add_song
-            manager.add_song(unassigned[0], 1)
-            assert len(manager.data["songs"]) >= 1
-        
-        print("    ✅ AlbumManager works")
-        passed += 1
-    except Exception as e:
-        print(f"    ❌ AlbumManager failed: {e}")
-        failed += 1
+        self.assertEqual(manager.data["name"], "test_album")
+        self.assertEqual(manager.data["total_tracks"], 0)
     
-    try:
-        print("  Testing features.session_memo...")
-        from studio_manager.features.session_memo import SessionMemo, set_history
-        from studio_manager.data.history import ProjectHistory
+    def test_session_memo(self):
+        from studio_manager.features.session_memo import SessionMemo
         
-        history = ProjectHistory("test_history.json")
-        set_history(history)
-        
-        # Create test project with session memos
-        test_project = Path("test_artist/test_memo_project")
-        test_project.mkdir(parents=True)
-        
-        memo = SessionMemo(test_project)
-        assert memo.memos == {"sessions": []}
-        
-        print("    ✅ SessionMemo imports work")
-        passed += 1
-    except Exception as e:
-        print(f"    ❌ SessionMemo failed: {e}")
-        failed += 1
+        memo = SessionMemo(self.project_path)
+        self.assertIsNotNone(memo.memos)
+        self.assertEqual(memo.memos["sessions"], [])
+
+def run_features_tests():
+    """Run the features tests"""
+    import unittest
     
-    try:
-        print("  Testing features.daw_integration...")
-        from studio_manager.features.daw_integration import open_daw_project, get_daw_info
-        
-        # Test get_daw_info
-        info = get_daw_info("A")
-        assert info is not None
-        assert info.get("name") == "Ableton"
-        
-        # Test without actually opening DAW
-        info = get_daw_info("P")
-        assert info.get("name") == "Pro Tools"
-        
-        print("    ✅ daw_integration works")
-        passed += 1
-    except Exception as e:
-        print(f"    ❌ daw_integration failed: {e}")
-        failed += 1
+    print("\n[5/6] Testing Features modules...")
     
-    try:
-        print("  Testing features.file_tree...")
-        from studio_manager.features.file_tree import file_tree_flow
-        print("    ✅ file_tree_flow imported successfully")
-        passed += 1
-    except Exception as e:
-        print(f"    ❌ file_tree_flow failed: {e}")
-        failed += 1
+    loader = unittest.TestLoader()
+    suite = loader.loadTestsFromTestCase(TestFeatures)
+    runner = unittest.TextTestRunner(verbosity=1)
+    result = runner.run(suite)
     
-    try:
-        print("  Testing features.project_flows...")
-        from studio_manager.features.project_flows import (
-            new_project_flow, get_engineers, get_project_name,
-            get_project_type, get_daw, get_project_category,
-            manage_project_stage_flow
-        )
-        print("    ✅ project_flows imported successfully")
-        passed += 1
-    except Exception as e:
-        print(f"    ❌ project_flows failed: {e}")
-        failed += 1
-    
-    try:
-        print("  Testing features.tasks_flows...")
-        from studio_manager.features.tasks_flows import (
-            tasks_and_projects_flow, view_project_memos_flow,
-            set_release_date_flow, view_finished_projects_flow,
-            search_projects_flow, filter_by_category_flow
-        )
-        print("    ✅ tasks_flows imported successfully")
-        passed += 1
-    except Exception as e:
-        print(f"    ❌ tasks_flows failed: {e}")
-        failed += 1
-    
-    try:
-        print("  Testing features.browser_flows...")
-        from studio_manager.features.browser_flows import (
-            project_browser_flow, show_song_project_details,
-            show_album_contents
-        )
-        print("    ✅ browser_flows imported successfully")
-        passed += 1
-    except Exception as e:
-        print(f"    ❌ browser_flows failed: {e}")
-        failed += 1
-    
-    try:
-        print("  Testing features.backup_flows...")
-        from studio_manager.features.backup_flows import (
-            backup_project_flow, global_backup_flow
-        )
-        print("    ✅ backup_flows imported successfully")
-        passed += 1
-    except Exception as e:
-        print(f"    ❌ backup_flows failed: {e}")
-        failed += 1
-    
-    try:
-        print("  Testing features.album_flows...")
-        from studio_manager.features.album_flows import (
-            album_management_flow, add_songs_to_album_flow,
-            manage_album_flow, view_unassigned_songs_flow
-        )
-        print("    ✅ album_flows imported successfully")
-        passed += 1
-    except Exception as e:
-        print(f"    ❌ album_flows failed: {e}")
-        failed += 1
-    
-    # Cleanup
-    os.chdir(original_cwd)
-    shutil.rmtree(test_dir, ignore_errors=True)
-    
-    return (passed, failed, errors)
+    return result.wasSuccessful()

@@ -1,14 +1,33 @@
+# studio_manager/core/file_system.py
+
 import logging
 import shutil
+import json
 from pathlib import Path
 from rich.panel import Panel
 from rich.tree import Tree
 from ..cli.display import console, print_success, print_error, clear_screen
 from ..utils.helpers import sanitize_filename, format_file_size, list_all_projects
 from ..utils.constants import PROJECT_SUBFOLDERS, SUBFOLDER_PURPOSES, DAW_PATHS
-from ..features.project_tracker import ProjectTracker
 
 logging.basicConfig(level=logging.WARNING)
+
+# Don't import ProjectTracker here to avoid circular import
+# We'll use a simple function to get stage info
+
+
+def get_project_stage(project_path: Path) -> str:
+    """Get the current stage of a project without importing ProjectTracker"""
+    tracker_file = project_path / ".project_tracker.json"
+    if tracker_file.exists():
+        try:
+            with open(tracker_file, 'r') as f:
+                data = json.load(f)
+                return data.get("current_stage", "production")
+        except:
+            pass
+    return "production"
+
 
 def create_project_folders(artist: str, name: str) -> Path:
     """Create the base project folders"""
@@ -23,6 +42,7 @@ def create_project_folders(artist: str, name: str) -> Path:
     
     return project_dir
 
+
 def create_project_subfolders(project_dir: Path):
     """Create production, mix, and master subfolders"""
     for folder in PROJECT_SUBFOLDERS:
@@ -35,6 +55,7 @@ def create_project_subfolders(project_dir: Path):
             readme_path.write_text(f"{folder.upper()} FOLDER\n{SUBFOLDER_PURPOSES[folder]}\nCreated: {Path.cwd()}")
     
     print_success("Production/Mix/Master folders created")
+
 
 def print_directory_tree(path: Path, max_depth: int = 3):
     """Print a tree view of the directory structure"""
@@ -61,20 +82,16 @@ def print_directory_tree(path: Path, max_depth: int = 3):
                     continue
                 
                 if item.is_dir():
-                    # Color coding for special folders
                     if item.name in ["production", "mix", "master"]:
                         branch = tree_node.add(f"[yellow]{item.name}/[/yellow] [dim]({item.name.capitalize()} Phase)[/dim]")
-                        # Show DAW session files inside stage folders
                         add_to_tree(item, branch, current_depth + 1)
                     elif item.name in ["ableton", "protools", "logic"]:
-                        # These should now be inside stage folders
                         branch = tree_node.add(f"[cyan]{item.name}/[/cyan] [dim](DAW Session)[/dim]")
                         add_to_tree(item, branch, current_depth + 1)
                     else:
                         branch = tree_node.add(f"[cyan]{item.name}/[/cyan]")
                         add_to_tree(item, branch, current_depth + 1)
                 else:
-                    # Show files, especially DAW session files
                     size_str = format_file_size(item.stat().st_size)
                     if item.suffix in ['.als', '.ptx', '.logicx']:
                         tree_node.add(f"[green]{item.name}[/green] [dim]({size_str})[/dim] [dim]🎛️[/dim]")
@@ -87,6 +104,7 @@ def print_directory_tree(path: Path, max_depth: int = 3):
     
     add_to_tree(path, tree)
     console.print(tree)
+
 
 def print_full_project_tree():
     """Print tree view of all projects with current stage highlighted"""
@@ -108,23 +126,19 @@ def print_full_project_tree():
                 
                 for project_dir in sorted(artist_dir.iterdir()):
                     if project_dir.is_dir() and not project_dir.name.startswith('.'):
-                        # Get the current stage for this project
-                        tracker = ProjectTracker(project_dir)
-                        current_stage = tracker.get_current_stage()
+                        # Use the simple function instead of ProjectTracker
+                        current_stage = get_project_stage(project_dir)
                         
                         project_branch = artist_branch.add(f"[green]{project_dir.name}/[/green] [dim](Project)[/dim]")
                         
-                        # Show stage folders (production, mix, master)
                         for stage_folder in ["production", "mix", "master"]:
                             stage_path = project_dir / stage_folder
                             if stage_path.exists() and stage_path.is_dir():
-                                # Highlight the current stage folder in green
                                 if stage_folder == current_stage:
                                     stage_branch = project_branch.add(f"[bold green]{stage_folder}/[/bold green] [dim]({stage_folder.capitalize()} Phase)[/dim]")
                                 else:
                                     stage_branch = project_branch.add(f"[yellow]{stage_folder}/[/yellow] [dim]({stage_folder.capitalize()} Phase)[/dim]")
                                 
-                                # Show contents of stage folder
                                 try:
                                     for item in sorted(stage_path.iterdir()):
                                         if item.is_file() and not item.name.startswith('.'):
@@ -139,7 +153,6 @@ def print_full_project_tree():
                                 except PermissionError:
                                     stage_branch.add("[red]Permission denied[/red]")
                         
-                        # Show finished folder if it exists
                         finished_path = project_dir / "finished"
                         if finished_path.exists() and finished_path.is_dir():
                             finished_branch = project_branch.add(f"[dim]finished/[/dim] [dim](Completed)[/dim]")

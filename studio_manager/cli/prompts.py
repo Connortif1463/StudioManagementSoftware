@@ -1,51 +1,10 @@
 # studio_manager/cli/prompts.py
 
 import sys
+import readline
 from rich.prompt import Prompt, Confirm
 from rich import print as rprint
 from .display import print_separator, print_dim, print_error, print_info, print_warning
-
-# Define DummyReadline at the module level FIRST
-class DummyReadline:
-    """Dummy readline class for when no real readline is available"""
-    def set_completer(self, *args, **kwargs): pass
-    def parse_and_bind(self, *args, **kwargs): pass
-    def set_completer_delims(self, *args, **kwargs): pass
-    def get_line_buffer(self, *args, **kwargs): return ""
-    def insert_text(self, *args, **kwargs): pass
-    def redisplay(self, *args, **kwargs): pass
-
-# Try to import readline with proper platform-specific handling
-readline = DummyReadline()
-
-# On Windows, use pyreadline3 if available
-if sys.platform == 'win32':
-    try:
-        import pyreadline3 as readline
-    except ImportError:
-        try:
-            import readline
-        except ImportError:
-            pass
-# On Mac, try gnureadline first, then built-in
-elif sys.platform == 'darwin':
-    try:
-        import gnureadline as readline
-    except ImportError:
-        try:
-            import readline  # Built-in libedit on macOS
-        except ImportError:
-            pass
-# On Linux, use built-in readline
-else:
-    try:
-        import readline
-    except ImportError:
-        pass
-
-# If we still don't have a real readline, use DummyReadline (already defined above)
-if readline is None:
-    readline = DummyReadline()
 
 # Track which tips have been shown for each field
 _tip_shown = {}
@@ -87,18 +46,13 @@ class CustomCompleter:
 def setup_completion(options):
     """Setup tab completion with proper cycling"""
     try:
-        if options and readline:
+        if options:
             completer = CustomCompleter(options)
             readline.set_completer(completer.complete)
             readline.parse_and_bind("tab: complete")
             readline.parse_and_bind("set show-all-if-ambiguous on")
-            
-            # On macOS with libedit, we need to set delimiter
-            if sys.platform == 'darwin' and hasattr(readline, 'set_completer_delims'):
-                readline.set_completer_delims(" \t\n;")
         else:
-            if readline and hasattr(readline, 'set_completer'):
-                readline.set_completer(None)
+            readline.set_completer(None)
     except Exception as e:
         # If readline fails, silently continue
         pass
@@ -152,6 +106,48 @@ def get_number_input(prompt: str, min_val: int = None, max_val: int = None, allo
     return num
 
 
+def get_candidates_from_history(field: str, history_obj) -> list:
+    """
+    Get candidates from history for a given field.
+    This properly gathers names from both sets and project entries.
+    """
+    candidates = []
+    
+    if field == "artist":
+        # Get artists from the artists set
+        candidates = list(history_obj.data.get("artists", set()))
+        
+        # Also get artists from projects
+        for project in history_obj.data.get("projects", []):
+            if project.get("artist"):
+                candidates.append(project.get("artist"))
+    
+    elif field == "engineer":
+        # Get engineers from the engineers set
+        candidates = list(history_obj.data.get("engineers", set()))
+        
+        # Also get engineers from projects
+        for project in history_obj.data.get("projects", []):
+            for eng in project.get("engineers", []):
+                if eng:
+                    candidates.append(eng)
+    
+    else:
+        # Generic field - try to get from data
+        candidates = list(history_obj.data.get(f"{field}s", []))
+        
+        # Also search in projects
+        for project in history_obj.data.get("projects", []):
+            if project.get(field):
+                if isinstance(project[field], list):
+                    candidates.extend(project[field])
+                else:
+                    candidates.append(project[field])
+    
+    # Remove duplicates and sort
+    return sorted(set(candidates))
+
+
 def get_input_with_completion(prompt: str, field: str, history_obj, allow_backtrack: bool = True) -> str:
     """
     Get user input with tab completion from history data.
@@ -159,43 +155,17 @@ def get_input_with_completion(prompt: str, field: str, history_obj, allow_backtr
     """
     global _tip_shown
     
-    # Get candidates from history
-    candidates = []
-    if field == "artist":
-        candidates = list(history_obj.data.get("artists", set()))
-    elif field == "engineer":
-        candidates = list(history_obj.data.get("engineers", set()))
-    else:
-        # Generic field - try to get from data
-        candidates = list(history_obj.data.get(f"{field}s", []))
-    
-    # Also add all names from projects
-    if field in ["artist", "engineer"]:
-        for project in history_obj.data.get("projects", []):
-            if field == "artist" and project.get("artist"):
-                candidates.append(project.get("artist"))
-            elif field == "engineer":
-                for eng in project.get("engineers", []):
-                    if eng:
-                        candidates.append(eng)
-    
-    # Remove duplicates and sort
-    candidates = sorted(set(candidates))
+    # Get candidates from history using the improved function
+    candidates = get_candidates_from_history(field, history_obj)
     
     # Setup tab completion with candidates
     setup_completion(candidates)
     
     # Show tip only ONCE per field per session
-    is_real_readline = not isinstance(readline, DummyReadline)
-    
-    # Only show the hint if:
-    # 1. There are candidates
-    # 2. We have a real readline
-    # 3. We haven't shown the tip for this field yet in this session
-    if candidates and is_real_readline and not _tip_shown.get(field, False):
+    if candidates and not _tip_shown.get(field, False):
         field_display = field.capitalize()
         print_info(f"\nTip: Press TAB to autocomplete {field_display} names from history")
-        _tip_shown[field] = True  # Mark as shown
+        _tip_shown[field] = True
     
     while True:
         user_input = input(f"{prompt}: ").strip()

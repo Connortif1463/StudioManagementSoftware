@@ -1,64 +1,63 @@
-"""Integration tests for the full Studio Management System"""
+# tests/test_integration.py
 
-import sys
-import os
+import unittest
+from pathlib import Path
 import tempfile
 import shutil
-from pathlib import Path
-from unittest.mock import patch, MagicMock
+import os
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+class TestIntegration(unittest.TestCase):
+    
+    def setUp(self):
+        self.test_dir = tempfile.mkdtemp()
+        self.original_cwd = os.getcwd()
+        os.chdir(self.test_dir)
+        
+        # Create project structure
+        (Path(self.test_dir) / "artists").mkdir(exist_ok=True)
+        (Path(self.test_dir) / "templates").mkdir(exist_ok=True)
+    
+    def tearDown(self):
+        os.chdir(self.original_cwd)
+        shutil.rmtree(self.test_dir, ignore_errors=True)
+    
+    def test_full_workflow(self):
+        """Test a full workflow: create project → create session → verify"""
+        from studio_manager.core.project_manager import create_project
+        from studio_manager.core.session_manager import create_session_from_template
+        from studio_manager.utils.helpers import get_project_path
+        
+        # Create a test template
+        templates_dir = Path(self.test_dir) / "templates" / "ableton templates"
+        templates_dir.mkdir(parents=True, exist_ok=True)
+        (templates_dir / "ableton template.als").touch()
+        
+        # Create a project
+        result = create_project(
+            name="integration_test",
+            project_type="S",
+            artist="test_artist",
+            daw="A"
+        )
+        self.assertTrue(result)
+        
+        # Verify project exists
+        project_path = get_project_path("test_artist", "integration_test")
+        self.assertTrue(project_path.exists())
+        
+        # Verify session was created
+        session_path = project_path / "production" / "ableton" / "integration_test_production_session.als"
+        self.assertTrue(session_path.exists())
 
 def run_integration_tests():
-    """Run all Integration tests"""
-    passed = 0
-    failed = 0
-    errors = 0
+    """Run the integration tests"""
+    import unittest
     
-    # Create temporary test directory
-    test_dir = Path(tempfile.mkdtemp())
-    original_cwd = Path.cwd()
-    os.chdir(test_dir)
+    print("\n[5/6] Testing Integration...")
     
-    # Create templates directory with dummy templates
-    templates_dir = test_dir / "templates"
-    templates_dir.mkdir()
-    for template in ["ableton template.als", "protools template.ptx", "logic template.logicx"]:
-        (templates_dir / template).touch()
+    loader = unittest.TestLoader()
+    suite = loader.loadTestsFromTestCase(TestIntegration)
+    runner = unittest.TextTestRunner(verbosity=1)
+    result = runner.run(suite)
     
-    try:
-        print("  Testing full project creation workflow...")
-        from studio_manager.core.project_manager import create_project
-        from studio_manager.data.history import ProjectHistory
-        from studio_manager.features.project_tracker import ProjectTracker
-        
-        # Test full project creation
-        history = ProjectHistory("test_history.json")
-        success = create_project("integration_test", "S", "test_artist", "A")
-        
-        if success:
-            # Verify files were created
-            project_path = test_dir / "artists" / "test_artist" / "integration_test"
-            if project_path.exists():
-                assert (project_path / "production").exists()
-                assert (project_path / "mix").exists()
-                assert (project_path / "master").exists()
-                print("    ✅ Full project creation workflow works")
-                passed += 1
-            else:
-                print("    ⚠️ Full project creation returned True but path not found")
-                passed += 1
-        else:
-            print("    ⚠️ Full project creation returned False (templates missing)")
-            passed += 1
-    except Exception as e:
-        print(f"    ❌ Full project creation workflow failed: {e}")
-        failed += 1
-    
-    # ... rest of tests ...
-    
-    # Cleanup
-    os.chdir(original_cwd)
-    shutil.rmtree(test_dir, ignore_errors=True)
-    
-    return (passed, failed, errors)
+    return result.wasSuccessful()

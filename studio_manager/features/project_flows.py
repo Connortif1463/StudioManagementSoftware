@@ -10,7 +10,6 @@ from ..utils.helpers import get_project_path
 from ..utils.constants import DAW_MAP
 from .open_project import ProjectOpener
 
-
 def get_engineers(history):
     """Get engineer names with validation and backtracking"""
     engineers = []
@@ -23,7 +22,7 @@ def get_engineers(history):
         
         for i in range(num_input):
             while True:
-                # Use get_input_with_completion for engineer names (with tab completion from history)
+                # Use get_input_with_completion for engineer names
                 engineer = get_input_with_completion(
                     f"\nEnter the name of engineer #{i+1}", 
                     "engineer",
@@ -34,7 +33,8 @@ def get_engineers(history):
                 if engineer == "##BACKTRACK##":
                     if i > 0:
                         print_warning("Going back to previous engineer...")
-                        engineers.pop() if engineers else None
+                        if engineers:
+                            engineers.pop()
                         continue
                     else:
                         print_warning("Going back to number of engineers...")
@@ -44,8 +44,9 @@ def get_engineers(history):
                     engineers.append(engineer)
                     break
             
-            if engineer == "##BACKTRACK##" and not engineers:
-                break
+            if engineers:
+                # Check if we need to continue or if the user cancelled
+                pass
         
         if engineers:
             return engineers
@@ -163,7 +164,7 @@ def new_project_flow(history):
         
         confirm = get_confirmation("\nCreate this project?")
         if confirm:
-            success = create_project(name, project_type, artist, daw)
+            success = create_project(name, project_type, artist, daw, logger=history.logger if hasattr(history, 'logger') else None)
             
             if success:
                 history.add_project(name, project_type, artist, engineers, daw)
@@ -194,6 +195,10 @@ def new_project_flow(history):
         print_warning("\nOperation cancelled by user")
         input("\nPress Enter to continue...")
     except Exception as e:
+        import traceback
+        # Log to session logger if available
+        if hasattr(history, 'logger'):
+            history.logger.log_error(e, "Project creation")
         print_error(f"\nAn unexpected error occurred: {e}")
         traceback.print_exc()
         input("\nPress Enter to continue...")

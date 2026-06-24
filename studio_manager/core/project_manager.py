@@ -1,3 +1,5 @@
+# studio_manager/core/project_manager.py
+
 import logging
 from pathlib import Path
 from ..cli.display import print_success, print_error
@@ -7,7 +9,7 @@ from .session_manager import create_session_from_template
 
 logging.basicConfig(level=logging.INFO)
 
-def create_project(name: str, project_type: str, artist: str, daw: str = "") -> bool:
+def create_project(name: str, project_type: str, artist: str, daw: str = "", logger=None) -> bool:
     """Create a new project"""
     try:
         if not name or not artist:
@@ -31,4 +33,6 @@ def create_project(name: str, project_type: str, artist: str, daw: str = "") -> 
     except Exception as e:
         logging.error(f"Failed to create project: {e}")
         print_error(f"Error creating project: {e}")
+        if logger:
+            logger.log_error(e, "Project creation", {"name": name, "artist": artist, "daw": daw})
         return False

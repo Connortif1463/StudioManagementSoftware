@@ -1,4 +1,7 @@
+# studio_manager/data/logger.py
+
 import json
+import traceback
 from pathlib import Path
 from datetime import datetime
 from typing import Dict, List
@@ -27,6 +30,18 @@ class SessionLogger:
             "description": description,
             "details": details or {}
         })
+    
+    def log_error(self, error: Exception, context: str = "", details: Dict = None):
+        """Log an error with full traceback"""
+        error_details = {
+            "error_type": type(error).__name__,
+            "error_message": str(error),
+            "traceback": traceback.format_exc(),
+            "context": context,
+            **(details or {})
+        }
+        self.log_action("ERROR", f"Error in {context}: {str(error)}", error_details)
+        return error_details
     
     def save_session(self):
         """Save the session log to file"""
