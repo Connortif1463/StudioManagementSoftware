@@ -5,7 +5,7 @@ import json
 from pathlib import Path
 from rich.prompt import Prompt, Confirm
 from rich import print as rprint
-from .display import print_separator, print_dim, print_error, print_info, print_warning
+from .display import print_separator, print_dim, print_error, print_info, print_warning, console
 
 # Define DummyReadline at the module level FIRST
 class DummyReadline:
@@ -17,34 +17,42 @@ class DummyReadline:
     def insert_text(self, *args, **kwargs): pass
     def redisplay(self, *args, **kwargs): pass
 
-# Try to import readline with proper platform-specific handling (matching session_memo.py)
+# Platform-specific readline import
 readline = DummyReadline()
+READLINE_TYPE = "Dummy"
 
 if sys.platform == 'win32':
     try:
-        import pyreadline3 as readline
+        import readline as rl
+        readline = rl
+        READLINE_TYPE = "readline"
     except ImportError:
         try:
-            import readline
+            import pyreadline3 as rl
+            readline = rl
+            READLINE_TYPE = "pyreadline3"
         except ImportError:
             pass
 elif sys.platform == 'darwin':
     try:
         import gnureadline as readline
+        READLINE_TYPE = "gnureadline"
     except ImportError:
         try:
-            import readline  # Built-in libedit on macOS
+            import readline
+            READLINE_TYPE = "libedit"
         except ImportError:
             pass
 else:
     try:
         import readline
+        READLINE_TYPE = "readline"
     except ImportError:
         pass
 
-# If we still don't have a real readline, use DummyReadline
-if readline is None or isinstance(readline, type) and readline.__name__ == 'DummyReadline':
+if readline is None:
     readline = DummyReadline()
+    READLINE_TYPE = "Dummy"
 
 # Track which tips have been shown for each field
 _tip_shown = {}
@@ -64,6 +72,7 @@ class CustomCompleter:
         self.last_text = ""
     
     def complete(self, text, state):
+        # Check if text has changed from last call
         if text != self.last_text:
             self.last_text = text
             self.index = -1
@@ -73,8 +82,9 @@ class CustomCompleter:
                 self.matches = [opt for opt in self.options if opt.lower().startswith(text.lower())]
             self.index = -1
         
-        if state == 0 and self.matches:
-            self.index = (self.index + 1) % len(self.matches)
+        # Cycle through matches
+        if state == 0:
+            self.index = (self.index + 1) % len(self.matches) if self.matches else -1
         
         if state < len(self.matches) and self.index >= 0:
             return self.matches[self.index]
@@ -82,11 +92,8 @@ class CustomCompleter:
 
 
 def setup_completion(options):
-    """Setup tab completion with proper cycling for both Windows and macOS"""
-    # Check if we have a real readline (not DummyReadline)
-    is_real_readline = not isinstance(readline, DummyReadline)
-    
-    if not is_real_readline or not readline:
+    """Setup tab completion with proper cycling - platform specific"""
+    if isinstance(readline, DummyReadline) or not readline:
         return
     
     try:
@@ -94,18 +101,16 @@ def setup_completion(options):
             completer = CustomCompleter(options)
             readline.set_completer(completer.complete)
             
-            # macOS (libedit) needs different binding
+            # Platform-specific binding
             if sys.platform == 'darwin':
                 try:
                     readline.parse_and_bind("bind ^I rl_complete")
                 except:
                     pass
-                # Also try standard binding
                 try:
                     readline.parse_and_bind("tab: complete")
                 except:
                     pass
-                # Set delimiter to handle spaces in names
                 try:
                     if hasattr(readline, 'set_completer_delims'):
                         readline.set_completer_delims(" \t\n;")
@@ -232,25 +237,39 @@ def get_candidates_from_history(field: str, history_obj) -> list:
 def get_input_with_completion(prompt: str, field: str, history_obj, allow_backtrack: bool = True) -> str:
     """
     Get user input with tab completion from history data.
-    Works on both Windows (pyreadline3) and macOS (libedit).
+    Supports cycling through options with TAB.
     """
     global _tip_shown
     
-    # Get candidates from history
+    # Get candidates from history using the improved function
     candidates = get_candidates_from_history(field, history_obj)
     
     # Setup tab completion with candidates
     setup_completion(candidates)
     
     # Show tip only ONCE per field per session
-    if candidates and not _tip_shown.get(field, False):
+    is_real_readline = not isinstance(readline, DummyReadline)
+    
+    # Only show the hint if:
+    # 1. There are candidates
+    # 2. We have a real readline
+    # 3. We haven't shown the tip for this field yet in this session
+    if candidates and is_real_readline and not _tip_shown.get(field, False):
         field_display = field.capitalize()
         print_info(f"\nTip: Press TAB to autocomplete {field_display} names from history")
+        # # On Windows, show the list since pyreadline3 visual completion can be flaky
+        # if sys.platform == 'win32':
+        #     console.print("[dim]Available options (type number to select):[/dim]")
+        #     for i, name in enumerate(candidates[:15], 1):
+        #         console.print(f"  [cyan]{i}[/cyan] - {name}")
+        #     if len(candidates) > 15:
+        #         console.print(f"  [dim]... and {len(candidates) - 15} more[/dim]")
         _tip_shown[field] = True
     
     while True:
         user_input = input(f"{prompt}: ").strip()
         
+        # Check for backtrack
         if allow_backtrack and user_input.lower() in ['b', 'back', 'backtrack', '..']:
             return "##BACKTRACK##"
         
@@ -258,10 +277,19 @@ def get_input_with_completion(prompt: str, field: str, history_obj, allow_backtr
             print_error("Input cannot be empty. Please try again.")
             continue
         
-        # Check if the input matches a candidate (case-insensitive)
+        # # On Windows, if it's a number, select by index
+        # if sys.platform == 'win32' and user_input.isdigit():
+        #     idx = int(user_input) - 1
+        #     if 0 <= idx < len(candidates):
+        #         return candidates[idx]
+        #     else:
+        #         print_error(f"Invalid selection. Please enter a number between 1 and {len(candidates)}")
+        #         continue
+        
+        # If there's a match in candidates, return the matched version (preserves case)
         for candidate in candidates:
             if candidate.lower() == user_input.lower():
                 return candidate
         
-        # If no match, return user input as-is
+        # If no match, return the user's input as-is (allows new entries)
         return user_input

@@ -9,7 +9,7 @@ from typing import Dict, List, Optional
 from rich.panel import Panel
 from rich.table import Table
 from ..cli.display import console, print_header, print_separator, print_success, print_info, print_error, print_warning, print_dim, clear_screen
-from ..cli.prompts import get_text_input, get_choice, get_confirmation
+from ..cli.prompts import get_text_input, get_choice, get_confirmation, setup_completion
 from ..data.history import ProjectHistory
 
 # Define DummyReadline at the module level FIRST
@@ -38,7 +38,7 @@ elif sys.platform == 'darwin':
         import gnureadline as readline
     except ImportError:
         try:
-            import readline
+            import readline  # Built-in libedit on macOS
         except ImportError:
             pass
 else:
@@ -113,25 +113,11 @@ class CustomCompleter:
             return self.matches[self.index]
         return None
 
-def setup_completion(options):
-    """Setup tab completion with proper cycling"""
-    try:
-        if options and readline:
-            completer = CustomCompleter(options)
-            readline.set_completer(completer.complete)
-            readline.parse_and_bind("tab: complete")
-            readline.parse_and_bind("set show-all-if-ambiguous on")
-            
-            if sys.platform == 'darwin' and hasattr(readline, 'set_completer_delims'):
-                readline.set_completer_delims(" \t\n;")
-        else:
-            if readline and hasattr(readline, 'set_completer'):
-                readline.set_completer(None)
-    except Exception as e:
-        pass
+# Uses setup_completion from prompts.py (imported at top)
 
 def get_input_with_completion(prompt: str, options: List[str], allow_new: bool = True, allow_empty: bool = False) -> str:
     """Get input with tab completion that cycles through options"""
+    # Use the shared setup_completion from prompts.py
     setup_completion(options)
     
     while True:
