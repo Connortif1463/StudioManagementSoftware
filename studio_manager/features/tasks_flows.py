@@ -232,7 +232,7 @@ def search_projects_flow():
     console.print("  [cyan]1[/cyan] - Project name")
     console.print("  [cyan]2[/cyan] - Artist name")
     console.print("  [cyan]3[/cyan] - Stage (production/mixing/mastering/finished)")
-    console.print("  [cyan]b[/cyan] - Go back")
+    console.print("  [blue]b[/blue] - Go back")
     
     search_type = get_raw_input("\nSelect option: ").strip()
     
@@ -592,7 +592,7 @@ def tasks_and_projects_flow(history):
     console.print("  [cyan]3[/cyan] - Set expected release date for a project")
     console.print("  [cyan]4[/cyan] - Search for a project")
     console.print("  [cyan]5[/cyan] - Filter by project category")
-    console.print("  [cyan]b[/cyan] - Go back")
+    console.print("  [blue]b[/blue] - Go back")
     
     choice = get_raw_input("\nSelect option: ").strip().lower()
     

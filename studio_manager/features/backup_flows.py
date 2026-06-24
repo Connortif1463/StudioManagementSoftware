@@ -1,9 +1,13 @@
+# studio_manager/features/backup_flows.py
+
 """Backup management flows"""
 from pathlib import Path
 from rich.panel import Panel
 from ..cli.display import clear_screen, console, print_success, print_error, print_warning, print_info
+from ..cli.prompts import get_raw_input
 from .project_tracker import ProjectTracker
 from ..utils.helpers import list_all_projects
+
 
 def backup_project_flow(project_path: Path):
     """Create or restore project backups"""
@@ -20,16 +24,16 @@ def backup_project_flow(project_path: Path):
     console.print("  [cyan]1[/cyan] - Backup current stage")
     console.print("  [cyan]2[/cyan] - Backup a specific stage")
     console.print("  [cyan]3[/cyan] - List existing backups")
-    console.print("  [cyan]b[/cyan] - Go back")
+    console.print("  [blue]b[/blue] - Go back")
     
-    choice = input("\nSelect option: ").strip()
+    choice = get_raw_input("\nSelect option: ").strip()
     
     if choice == "1":
-        engineer = input("Enter engineer name for this backup (or press Enter to skip): ").strip()
+        engineer = get_raw_input("Enter engineer name for this backup (or press Enter to skip): ").strip()
         if not engineer:
             engineer = None
         
-        custom_path = input("Enter backup path (or press Enter for auto-generated): ").strip()
+        custom_path = get_raw_input("Enter backup path (or press Enter for auto-generated): ").strip()
         if custom_path:
             tracker.create_backup(Path(custom_path), engineer)
         else:
@@ -44,15 +48,15 @@ def backup_project_flow(project_path: Path):
             current = " [current]" if stage == tracker.get_current_stage() else ""
             console.print(f"  [cyan]{i}[/cyan] - {stage}{current} [{exists}]")
         
-        stage_choice = input("\nSelect stage number: ").strip()
+        stage_choice = get_raw_input("\nSelect stage number: ").strip()
         if stage_choice.isdigit():
             idx = int(stage_choice) - 1
             if 0 <= idx < len(ProjectTracker.STAGES):
                 selected_stage = ProjectTracker.STAGES[idx]
-                engineer = input("Enter engineer name (or press Enter to skip): ").strip()
+                engineer = get_raw_input("Enter engineer name (or press Enter to skip): ").strip()
                 if not engineer:
                     engineer = None
-                custom_path = input("Enter backup path (or press Enter for auto-generated): ").strip()
+                custom_path = get_raw_input("Enter backup path (or press Enter for auto-generated): ").strip()
                 if custom_path:
                     tracker.create_backup(Path(custom_path), engineer, selected_stage)
                 else:
@@ -72,6 +76,7 @@ def backup_project_flow(project_path: Path):
         print_error("Invalid option")
         input("\nPress Enter to continue...")
 
+
 def global_backup_flow():
     """Backup all projects"""
     clear_screen()
@@ -87,19 +92,25 @@ def global_backup_flow():
     console.print(f"\n[bold]Backup Options:[/bold]")
     console.print("  [cyan]1[/cyan] - Backup a single project")
     console.print("  [cyan]2[/cyan] - Backup all projects")
-    console.print("  [cyan]b[/cyan] - Go back")
+    console.print("  [blue]b[/blue] - Go back")
     
-    backup_choice = input("\nSelect option: ").strip()
+    backup_choice = get_raw_input("\nSelect option: ").strip()
     
     if backup_choice == "1":
         projects = list_all_projects()
         if projects:
-            print("\n[bold]Select project to backup:[/bold]")
+            console.print("\n[bold]Select project to backup:[/bold]")
             for i, p in enumerate(projects[:10], 1):
-                print(f"  {i}. {p['artist']} - {p['project']}")
-            proj_choice = input("\nSelect project: ").strip()
+                console.print(f"  [cyan]{i}[/cyan] - {p['artist']} - {p['project']}")
+            if len(projects) > 10:
+                console.print(f"  [dim]... and {len(projects) - 10} more[/dim]")
+            
+            proj_choice = get_raw_input("\nSelect project: ").strip()
             if proj_choice.isdigit() and 1 <= int(proj_choice) <= len(projects[:10]):
                 backup_project_flow(projects[int(proj_choice)-1]["path"])
+            else:
+                print_error("Invalid selection")
+                input("\nPress Enter to continue...")
         else:
             print_warning("No projects found")
     elif backup_choice == "2":
@@ -111,3 +122,6 @@ def global_backup_flow():
         input("\nPress Enter to continue...")
     elif backup_choice == 'b':
         return
+    else:
+        print_error("Invalid option")
+        input("\nPress Enter to continue...")

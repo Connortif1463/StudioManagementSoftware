@@ -301,7 +301,7 @@ def get_input_with_completion(prompt: str, field: str, history_obj, allow_backtr
     
     if candidates and is_real_readline and not _tip_shown.get(field, False):
         field_display = field.capitalize()
-        print_info(f"\nTip: Press TAB to autocomplete {field_display} names from history")
+        print_info(f"\n[cyan]Tip: Press TAB to autocomplete {field_display} names from history[/cyan]")
         _tip_shown[field] = True
     
     try:

@@ -17,7 +17,7 @@ def search_projects_flow():
     console.print("  [cyan]1[/cyan] - Project name")
     console.print("  [cyan]2[/cyan] - Artist name")
     console.print("  [cyan]3[/cyan] - Stage (production/mixing/mastering/finished)")
-    console.print("  [cyan]b[/cyan] - Go back")
+    console.print("  [blue]b[/blue] - Go back")
     
     search_type = input("\nSelect option: ").strip()
     
