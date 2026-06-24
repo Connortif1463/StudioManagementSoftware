@@ -7,7 +7,7 @@ from typing import Dict, Optional
 from rich.panel import Panel
 from rich.table import Table
 from ..cli.display import clear_screen, console, print_success, print_error, print_warning, print_info, print_separator, show_statistics_table
-from ..cli.prompts import get_confirmation
+from ..cli.prompts import get_confirmation, get_raw_input
 from .project_tracker import ProjectTracker
 from .session_memo import SessionMemo, prompt_for_session_memo
 from ..utils.helpers import get_project_path, list_all_projects
@@ -53,7 +53,7 @@ def view_project_memos_flow():
     
     console.print(table)
     
-    proj_choice = input("\nSelect project number (or 'b' to go back): ").strip()
+    proj_choice = get_raw_input("\nSelect project number (or 'b' to go back): ").strip()
     if proj_choice.lower() != 'b' and proj_choice.isdigit():
         idx = int(proj_choice) - 1
         if 0 <= idx < len(active_songs):
@@ -61,7 +61,7 @@ def view_project_memos_flow():
             project_path = project["path"]
             memo = SessionMemo(project_path)
             
-            view_choice = input("\nInteractive navigation? (y/n, default y): ").strip().lower()
+            view_choice = get_raw_input("\nInteractive navigation? (y/n, default y): ").strip().lower()
             if view_choice == 'n':
                 memo.view_memos(interactive=False)
             else:
@@ -71,9 +71,6 @@ def view_project_memos_flow():
             input("\nPress Enter to continue...")
     elif proj_choice.lower() == 'b':
         return
-    
-    # If we get here (user pressed b or invalid), return to tasks menu
-    return
 
 
 def set_release_date_flow():
@@ -117,7 +114,7 @@ def set_release_date_flow():
     
     console.print(table)
     
-    proj_choice = input("\nSelect project number (or 'b' to go back): ").strip()
+    proj_choice = get_raw_input("\nSelect project number (or 'b' to go back): ").strip()
     if proj_choice.lower() == 'b':
         return
     
@@ -135,16 +132,14 @@ def set_release_date_flow():
     project, tracker = active_songs[idx]
     
     while True:
-        release_date = input("\nEnter expected release date (YYYY-MM-DD) or press Enter to cancel: ").strip()
+        release_date = get_raw_input("\nEnter expected release date (YYYY-MM-DD) or press Enter to cancel: ").strip()
         if not release_date:
             print_info("Cancelled")
             input("\nPress Enter to continue...")
             return
         
-        # Validate date format
         try:
             datetime.fromisoformat(release_date)
-            # Valid date, set it
             tracker.data["release_date"] = release_date
             tracker.calculate_priority()
             tracker.save()
@@ -203,7 +198,7 @@ def view_finished_projects_flow():
     console.print(table)
     
     if get_confirmation("\nReopen a finished project?"):
-        choice = input("Enter project number to reopen: ").strip()
+        choice = get_raw_input("Enter project number to reopen: ").strip()
         if choice.isdigit():
             idx = int(choice) - 1
             if 0 <= idx < len(finished_songs):
@@ -214,7 +209,7 @@ def view_finished_projects_flow():
                     tracker.update_stage("mastering", "Reopened from finished")
                     print_success(f"Project '{project['project']}' moved back to mastering")
                     input("\nPress Enter to continue...")
-                    return  # Return after reopening
+                    return
                 else:
                     input("\nPress Enter to continue...")
                     return
@@ -226,9 +221,6 @@ def view_finished_projects_flow():
             print_error("Please enter a valid number")
             input("\nPress Enter to continue...")
             return
-    else:
-        # If they don't want to reopen, just return
-        return
 
 
 def search_projects_flow():
@@ -242,18 +234,18 @@ def search_projects_flow():
     console.print("  [cyan]3[/cyan] - Stage (production/mixing/mastering/finished)")
     console.print("  [cyan]b[/cyan] - Go back")
     
-    search_type = input("\nSelect option: ").strip()
+    search_type = get_raw_input("\nSelect option: ").strip()
     
     if search_type == 'b':
         return
     elif search_type == "1":
-        search_term = input("Enter project name (or partial name): ").strip().lower()
+        search_term = get_raw_input("Enter project name (or partial name): ").strip().lower()
         field = "name"
     elif search_type == "2":
-        search_term = input("Enter artist name (or partial name): ").strip().lower()
+        search_term = get_raw_input("Enter artist name (or partial name): ").strip().lower()
         field = "artist"
     elif search_type == "3":
-        search_term = input("Enter stage (production/mixing/mastering/finished): ").strip().lower()
+        search_term = get_raw_input("Enter stage (production/mixing/mastering/finished): ").strip().lower()
         field = "stage"
     else:
         print_error("Invalid option")
@@ -290,7 +282,6 @@ def search_projects_flow():
     
     for idx, (project, stage) in enumerate(results[:20], 1):
         created_pretty = project.get("date_created_pretty", "Unknown")
-        # Format date
         try:
             if created_pretty != "Unknown" and 'T' in created_pretty:
                 dt = datetime.fromisoformat(created_pretty)
@@ -312,7 +303,7 @@ def search_projects_flow():
         console.print(f"[dim]... and {len(results) - 20} more results[/dim]")
     
     if results and get_confirmation("\nView project details?"):
-        choice = input("Enter project number: ").strip()
+        choice = get_raw_input("Enter project number: ").strip()
         if choice.isdigit():
             idx = int(choice) - 1
             if 0 <= idx < len(results[:20]):
@@ -339,7 +330,7 @@ def filter_by_category_flow(history):
     console.print("  [cyan]a[/cyan] - All categories")
     console.print("  [cyan]b[/cyan] - Go back")
     
-    choice = input("\nSelect category: ").strip().lower()
+    choice = get_raw_input("\nSelect category: ").strip().lower()
     
     category_map = {
         "1": "studio_session",
@@ -398,7 +389,7 @@ def filter_by_category_flow(history):
     console.print("  [cyan]3[/cyan] - Set release date for a project")
     console.print("  [cyan]b[/cyan] - Go back")
     
-    action = input("\nSelect option: ").strip().lower()
+    action = get_raw_input("\nSelect option: ").strip().lower()
     
     if action == 'b':
         return
@@ -408,7 +399,7 @@ def filter_by_category_flow(history):
         input("\nPress Enter to continue...")
         return
     
-    proj_choice = input("\nEnter project number: ").strip()
+    proj_choice = get_raw_input("\nEnter project number: ").strip()
     if not proj_choice.isdigit():
         print_error("Please enter a valid number")
         input("\nPress Enter to continue...")
@@ -424,7 +415,6 @@ def filter_by_category_flow(history):
     project_path = project["path"]
     
     if action == "1":
-        # Open the project
         opener = ProjectOpener()
         selected_session, affected_sessions = opener.open_project_interactive(project_path, history)
         
@@ -446,19 +436,17 @@ def filter_by_category_flow(history):
             print_warning("No session was opened.")
             
     elif action == "2":
-        # View memos
         memo = SessionMemo(project_path)
-        view_choice = input("\nInteractive navigation? (y/n, default y): ").strip().lower()
+        view_choice = get_raw_input("\nInteractive navigation? (y/n, default y): ").strip().lower()
         if view_choice == 'n':
             memo.view_memos(interactive=False)
         else:
             memo.view_memos(interactive=True)
         input("\nPress Enter to continue...")
     elif action == "3":
-        # Set release date
         tracker = ProjectTracker(project_path)
         while True:
-            release_date = input("\nEnter expected release date (YYYY-MM-DD) or press Enter to cancel: ").strip()
+            release_date = get_raw_input("\nEnter expected release date (YYYY-MM-DD) or press Enter to cancel: ").strip()
             if not release_date:
                 break
             try:
@@ -487,15 +475,12 @@ def tasks_and_projects_flow(history):
     finished_songs = []
     
     for project in projects:
-        # Skip albums - they have .album.json file
         if (project["path"] / ".album.json").exists():
             continue
         
-        # Skip backup folders
         if "_backup_" in project["project"]:
             continue
         
-        # It's a song project
         tracker = ProjectTracker(project["path"])
         stage = tracker.get_current_stage()
         project["stage"] = stage
@@ -523,14 +508,12 @@ def tasks_and_projects_flow(history):
         for idx, project in enumerate(active_songs, 1):
             created_pretty = project.get("date_created_pretty", "Unknown")
             
-            # Format the date properly
             if created_pretty != "Unknown":
                 try:
                     if 'T' in created_pretty:
                         dt = datetime.fromisoformat(created_pretty)
                         created_pretty = dt.strftime("%Y-%m-%d %H:%M")
                 except:
-                    # If parsing fails, try to get from tracker
                     tracker = ProjectTracker(project["path"])
                     if tracker.data.get("stage_history"):
                         created_str = tracker.data["stage_history"][0].get("started", "")
@@ -542,16 +525,7 @@ def tasks_and_projects_flow(history):
                                 import time
                                 mod_time = project["path"].stat().st_ctime
                                 created_pretty = time.strftime("%Y-%m-%d %H:%M", time.localtime(mod_time))
-                        else:
-                            import time
-                            mod_time = project["path"].stat().st_ctime
-                            created_pretty = time.strftime("%Y-%m-%d %H:%M", time.localtime(mod_time))
-                    else:
-                        import time
-                        mod_time = project["path"].stat().st_ctime
-                        created_pretty = time.strftime("%Y-%m-%d %H:%M", time.localtime(mod_time))
             else:
-                # Fallback to tracker or file system
                 tracker = ProjectTracker(project["path"])
                 if tracker.data.get("stage_history"):
                     created_str = tracker.data["stage_history"][0].get("started", "")
@@ -602,7 +576,6 @@ def tasks_and_projects_flow(history):
     else:
         console.print("[dim]No active songs in progress[/dim]")
     
-    # Show finished songs count
     if finished_songs:
         print_separator()
         console.print(f"[dim]Note: {len(finished_songs)} finished song(s) not shown.[/dim]")
@@ -621,13 +594,12 @@ def tasks_and_projects_flow(history):
     console.print("  [cyan]5[/cyan] - Filter by project category")
     console.print("  [cyan]b[/cyan] - Go back")
     
-    choice = input("\nSelect option: ").strip().lower()
+    choice = get_raw_input("\nSelect option: ").strip().lower()
     
     if choice == "1":
         if active_songs:
-            proj_choice = input("\nEnter the number of the project to open (or 'b' to go back): ").strip().lower()
+            proj_choice = get_raw_input("\nEnter the number of the project to open (or 'b' to go back): ").strip().lower()
             
-            # Add backtrack handling
             if proj_choice == 'b':
                 tasks_and_projects_flow(history)
                 return
@@ -638,11 +610,9 @@ def tasks_and_projects_flow(history):
                     project = active_songs[idx]
                     project_path = project["path"]
                     
-                    # Open the project
                     opener = ProjectOpener()
                     selected_session, affected_sessions = opener.open_project_interactive(project_path, history)
                     
-                    # Only proceed if we got a valid session back
                     if selected_session:
                         print_separator()
                         console.print("[bold]Session Complete![/bold]")
@@ -654,7 +624,6 @@ def tasks_and_projects_flow(history):
                         if get_confirmation("\nUpdate project stage after this session?"):
                             manage_project_stage_flow(project_path)
                         
-                        # Pass the session data to the memo prompt
                         prompt_for_session_memo(project_path, history, is_manual=False,
                                               selected_session=selected_session,
                                               affected_sessions=affected_sessions)

@@ -9,7 +9,7 @@ from typing import Dict, List, Optional
 from rich.panel import Panel
 from rich.table import Table
 from ..cli.display import console, print_header, print_separator, print_success, print_info, print_error, print_warning, print_dim, clear_screen
-from ..cli.prompts import get_text_input, get_choice, get_confirmation, setup_completion
+from ..cli.prompts import get_text_input, get_choice, get_confirmation, enable_tab_completion, disable_tab_completion
 from ..data.history import ProjectHistory
 
 # Define DummyReadline at the module level FIRST
@@ -113,129 +113,140 @@ class CustomCompleter:
             return self.matches[self.index]
         return None
 
-# Uses setup_completion from prompts.py (imported at top)
+# Uses enable_tab_completion and disable_tab_completion from prompts.py
 
 def get_input_with_completion(prompt: str, options: List[str], allow_new: bool = True, allow_empty: bool = False) -> str:
     """Get input with tab completion that cycles through options"""
-    # Use the shared setup_completion from prompts.py
-    setup_completion(options)
+    disable_tab_completion()
+    enable_tab_completion(options)
     
-    while True:
-        user_input = input(f"{prompt}: ").strip()
-        
-        if user_input.lower() in ['b', 'back', 'backtrack', '..']:
-            return "##BACKTRACK##"
-        
-        if not user_input:
-            if allow_empty:
-                return ""
-            print_error("Input cannot be empty")
-            continue
-        
-        matched = None
-        for opt in options:
-            if opt.lower() == user_input.lower():
-                matched = opt
-                break
-        
-        if matched:
-            return matched
-        
-        partial_matches = [opt for opt in options if opt.lower().startswith(user_input.lower())]
-        if partial_matches:
-            print_warning("Did you mean one of these?")
-            for i, match in enumerate(partial_matches[:5], 1):
-                console.print(f"  {i}. {match}")
-            if allow_new:
-                console.print("  0. Use as new")
+    try:
+        while True:
+            user_input = input(f"{prompt}: ").strip()
             
-            choice = input("\nSelect option: ").strip()
-            if choice.isdigit():
-                idx = int(choice) - 1
-                if 0 <= idx < len(partial_matches[:5]):
-                    return partial_matches[idx]
-                elif int(choice) == 0 and allow_new:
-                    return user_input
-            continue
-        
-        if allow_new:
+            if user_input.lower() in ['b', 'back', 'backtrack', '..']:
+                return "##BACKTRACK##"
+            
+            if not user_input:
+                if allow_empty:
+                    return ""
+                print_error("Input cannot be empty")
+                continue
+            
+            matched = None
+            for opt in options:
+                if opt.lower() == user_input.lower():
+                    matched = opt
+                    break
+            
+            if matched:
+                return matched
+            
+            partial_matches = [opt for opt in options if opt.lower().startswith(user_input.lower())]
+            if partial_matches:
+                print_warning("Did you mean one of these?")
+                for i, match in enumerate(partial_matches[:5], 1):
+                    console.print(f"  {i}. {match}")
+                if allow_new:
+                    console.print("  0. Use as new")
+                
+                choice = input("\nSelect option: ").strip()
+                if choice.isdigit():
+                    idx = int(choice) - 1
+                    if 0 <= idx < len(partial_matches[:5]):
+                        return partial_matches[idx]
+                    elif int(choice) == 0 and allow_new:
+                        return user_input
+                continue
+            
+            if allow_new:
+                return user_input
+            
             return user_input
-        
-        return user_input
+    finally:
+        disable_tab_completion()
 
 def get_role_input(prompt: str) -> str:
     """Get role input with tab cycling"""
-    setup_completion(AVAILABLE_ROLES)
+    disable_tab_completion()
+    enable_tab_completion(AVAILABLE_ROLES)
     
-    while True:
-        role_input = input(f"{prompt}: ").strip()
-        
-        if role_input.lower() in ['b', 'back', 'backtrack', '..']:
-            return "##BACKTRACK##"
-        
-        if not role_input:
-            print_error("Role cannot be empty")
-            continue
-        
-        matched = None
-        for role in AVAILABLE_ROLES:
-            if role.lower() == role_input.lower():
-                matched = role
-                break
-        
-        if not matched:
+    try:
+        while True:
+            role_input = input(f"{prompt}: ").strip()
+            
+            if role_input.lower() in ['b', 'back', 'backtrack', '..']:
+                return "##BACKTRACK##"
+            
+            if not role_input:
+                print_error("Role cannot be empty")
+                continue
+            
+            matched = None
             for role in AVAILABLE_ROLES:
-                if role.lower().startswith(role_input.lower()):
+                if role.lower() == role_input.lower():
                     matched = role
                     break
-        
-        if matched:
-            return matched
-        
-        print_error(f"'{role_input}' is not a valid role")
-        print_info(f"Please choose from: {', '.join(AVAILABLE_ROLES)}")
+            
+            if not matched:
+                for role in AVAILABLE_ROLES:
+                    if role.lower().startswith(role_input.lower()):
+                        matched = role
+                        break
+            
+            if matched:
+                return matched
+            
+            print_error(f"'{role_input}' is not a valid role")
+            print_info(f"Please choose from: {', '.join(AVAILABLE_ROLES)}")
+    finally:
+        disable_tab_completion()
 
 def get_instrument_input(prompt: str) -> str:
     """Get instrument input with autocomplete for musicians"""
-    setup_completion(AVAILABLE_INSTRUMENTS)
+    disable_tab_completion()
+    enable_tab_completion(AVAILABLE_INSTRUMENTS)
     
-    while True:
-        instrument = input(f"{prompt}: ").strip()
-        
-        if instrument.lower() in ['b', 'back', 'backtrack', '..']:
-            return "##BACKTRACK##"
-        
-        if not instrument:
-            print_error("Instrument cannot be empty")
-            continue
-        
-        matched = None
-        for inst in AVAILABLE_INSTRUMENTS:
-            if inst.lower() == instrument.lower():
-                matched = inst
-                break
-        
-        if matched:
-            return matched
-        
-        partial_matches = [inst for inst in AVAILABLE_INSTRUMENTS if inst.lower().startswith(instrument.lower())]
-        if partial_matches:
-            print_warning("Did you mean one of these?")
-            for i, match in enumerate(partial_matches[:5], 1):
-                console.print(f"  {i}. {match}")
-            console.print("  0. Use as new instrument")
+    try:
+        while True:
+            instrument = input(f"{prompt}: ").strip()
             
-            choice = input("\nSelect option: ").strip()
-            if choice.isdigit():
-                idx = int(choice) - 1
-                if 0 <= idx < len(partial_matches[:5]):
-                    return partial_matches[idx]
-                elif int(choice) == 0:
-                    return instrument
-        
-        confirm = input(f"Use '{instrument}' as custom instrument? (y/n): ").strip().lower()
-        if confirm in ['y', 'yes']:
-            return instrument
+            if instrument.lower() in ['b', 'back', 'backtrack', '..']:
+                return "##BACKTRACK##"
+            
+            if not instrument:
+                print_error("Instrument cannot be empty")
+                continue
+            
+            matched = None
+            for inst in AVAILABLE_INSTRUMENTS:
+                if inst.lower() == instrument.lower():
+                    matched = inst
+                    break
+            
+            if matched:
+                return matched
+            
+            partial_matches = [inst for inst in AVAILABLE_INSTRUMENTS if inst.lower().startswith(instrument.lower())]
+            if partial_matches:
+                print_warning("Did you mean one of these?")
+                for i, match in enumerate(partial_matches[:5], 1):
+                    console.print(f"  {i}. {match}")
+                console.print("  0. Use as new instrument")
+                
+                choice = input("\nSelect option: ").strip()
+                if choice.isdigit():
+                    idx = int(choice) - 1
+                    if 0 <= idx < len(partial_matches[:5]):
+                        return partial_matches[idx]
+                    elif int(choice) == 0:
+                        return instrument
+            
+            confirm = input(f"Use '{instrument}' as custom instrument? (y/n): ").strip().lower()
+            if confirm in ['y', 'yes']:
+                return instrument
+    finally:
+        disable_tab_completion()
 
 class SessionMemo:
     """Handles session memos"""

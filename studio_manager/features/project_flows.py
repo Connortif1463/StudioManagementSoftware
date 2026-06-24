@@ -1,14 +1,17 @@
+# studio_manager/features/project_flows.py
+
 """Project creation and management flows"""
 import traceback
 from pathlib import Path
 from rich.panel import Panel
 from ..cli.display import clear_screen, console, print_success, print_error, print_warning, print_info
-from ..cli.prompts import get_confirmation, get_text_input, get_choice, get_number_input, get_input_with_completion
+from ..cli.prompts import get_confirmation, get_text_input, get_choice, get_number_input, get_input_with_completion, get_raw_input
 from ..core.project_manager import create_project
 from .project_tracker import ProjectTracker
 from ..utils.helpers import get_project_path
 from ..utils.constants import DAW_MAP
 from .open_project import ProjectOpener
+
 
 def get_engineers(history):
     """Get engineer names with validation and backtracking"""
@@ -22,7 +25,6 @@ def get_engineers(history):
         
         for i in range(num_input):
             while True:
-                # Try with tab completion first, fallback to selection menu
                 engineer = get_input_with_completion(
                     f"\nEnter the name of engineer #{i+1}", 
                     "engineer",
@@ -80,7 +82,7 @@ def get_project_category():
     console.print("  [cyan]5[/cyan] - Fun / Experiment")
     console.print("  [cyan]b[/cyan] - Go back")
     
-    category_choice = input("\nSelect category: ").strip().lower()
+    category_choice = get_raw_input("\nSelect category: ").strip().lower()
     category_map = {
         "1": "studio_session",
         "2": "live_recording",
@@ -105,13 +107,13 @@ def manage_project_stage_flow(project_path: Path):
         current = " [current]" if stage == tracker.get_current_stage() else ""
         console.print(f"  [cyan]{i}[/cyan] - {stage}{current}")
     
-    choice = input("\nSelect new stage (or 'b' to go back): ").strip()
+    choice = get_raw_input("\nSelect new stage (or 'b' to go back): ").strip()
     if choice.isdigit():
         idx = int(choice) - 1
         if 0 <= idx < len(ProjectTracker.STAGES):
             new_stage = ProjectTracker.STAGES[idx]
             if new_stage != tracker.get_current_stage():
-                notes = input("Any notes about this stage change? (press Enter to skip): ").strip()
+                notes = get_raw_input("Any notes about this stage change? (press Enter to skip): ").strip()
                 tracker.update_stage(new_stage, notes)
                 input("\nPress Enter to continue...")
 
@@ -135,7 +137,6 @@ def new_project_flow(history):
         if project_type == "##BACKTRACK##":
             return
         
-        # Use get_input_with_completion for artist names (with tab completion from history)
         artist = get_input_with_completion("\nEnter the name of the artist", "artist", history, allow_backtrack=True)
         if artist == "##BACKTRACK##":
             return
@@ -195,7 +196,6 @@ def new_project_flow(history):
         input("\nPress Enter to continue...")
     except Exception as e:
         import traceback
-        # Log to session logger if available
         if hasattr(history, 'logger'):
             history.logger.log_error(e, "Project creation")
         print_error(f"\nAn unexpected error occurred: {e}")

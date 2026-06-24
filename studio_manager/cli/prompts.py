@@ -3,7 +3,6 @@
 import sys
 import json
 from pathlib import Path
-from rich.prompt import Prompt, Confirm
 from rich import print as rprint
 from .display import print_separator, print_dim, print_error, print_info, print_warning, console
 
@@ -54,6 +53,19 @@ if readline is None:
     readline = DummyReadline()
     READLINE_TYPE = "Dummy"
 
+# Initialize readline settings - make 'b' a normal character
+if not isinstance(readline, DummyReadline):
+    try:
+        readline.parse_and_bind("tab: self-insert")
+        if sys.platform == 'darwin':
+            try:
+                readline.parse_and_bind('"b": self-insert')
+                readline.parse_and_bind('"B": self-insert')
+            except:
+                pass
+    except:
+        pass
+
 # Track which tips have been shown for each field
 _tip_shown = {}
 
@@ -72,7 +84,6 @@ class CustomCompleter:
         self.last_text = ""
     
     def complete(self, text, state):
-        # Check if text has changed from last call
         if text != self.last_text:
             self.last_text = text
             self.index = -1
@@ -82,7 +93,6 @@ class CustomCompleter:
                 self.matches = [opt for opt in self.options if opt.lower().startswith(text.lower())]
             self.index = -1
         
-        # Cycle through matches
         if state == 0:
             self.index = (self.index + 1) % len(self.matches) if self.matches else -1
         
@@ -91,8 +101,8 @@ class CustomCompleter:
         return None
 
 
-def setup_completion(options):
-    """Setup tab completion with proper cycling - platform specific"""
+def enable_tab_completion(options):
+    """Enable tab completion with the given options"""
     if isinstance(readline, DummyReadline) or not readline:
         return
     
@@ -101,7 +111,6 @@ def setup_completion(options):
             completer = CustomCompleter(options)
             readline.set_completer(completer.complete)
             
-            # Platform-specific binding
             if sys.platform == 'darwin':
                 try:
                     readline.parse_and_bind("bind ^I rl_complete")
@@ -111,13 +120,7 @@ def setup_completion(options):
                     readline.parse_and_bind("tab: complete")
                 except:
                     pass
-                try:
-                    if hasattr(readline, 'set_completer_delims'):
-                        readline.set_completer_delims(" \t\n;")
-                except:
-                    pass
             else:
-                # Windows/Linux
                 readline.parse_and_bind("tab: complete")
                 readline.parse_and_bind("set show-all-if-ambiguous on")
         else:
@@ -127,16 +130,70 @@ def setup_completion(options):
         pass
 
 
+def disable_tab_completion():
+    """Disable tab completion and restore normal character input"""
+    if isinstance(readline, DummyReadline) or not readline:
+        return
+    
+    try:
+        if hasattr(readline, 'set_completer'):
+            readline.set_completer(None)
+        
+        try:
+            readline.parse_and_bind("tab: self-insert")
+        except:
+            pass
+        
+        if sys.platform == 'darwin':
+            try:
+                readline.parse_and_bind('"b": self-insert')
+                readline.parse_and_bind('"B": self-insert')
+            except:
+                pass
+    except Exception as e:
+        pass
+
+
+def get_raw_input(prompt: str) -> str:
+    """Get input without any readline interference"""
+    disable_tab_completion()
+    return input(prompt)
+
+
 def get_choice(prompt: str, choices: list, default: str = None) -> str:
-    return Prompt.ask(prompt, choices=choices, default=default)
+    """Get a choice from the user with Rich formatting"""
+    disable_tab_completion()
+    
+    # Format choices with color using Rich
+    choices_display = "/".join([f"[cyan]{c}[/cyan]" for c in choices])
+    console.print(f"{prompt} [{choices_display}]", end=" ")
+    
+    while True:
+        user_input = get_raw_input("").strip().upper()
+        if user_input in choices:
+            return user_input
+        if default and user_input == "":
+            return default
+        print_error(f"Invalid choice. Please choose from: {', '.join(choices)}")
 
 
 def get_confirmation(prompt: str) -> bool:
-    return Confirm.ask(prompt)
+    """Get yes/no confirmation with Rich formatting"""
+    disable_tab_completion()
+    
+    console.print(f"{prompt} [cyan]y[/cyan]/[cyan]n[/cyan]: ", end="")
+    
+    while True:
+        user_input = get_raw_input("").strip().lower()
+        if user_input in ['y', 'yes']:
+            return True
+        if user_input in ['n', 'no']:
+            return False
+        print_error("Please enter 'y' or 'n'")
 
 
 def get_text_input(prompt: str, allow_empty: bool = False, allow_backtrack: bool = True) -> str:
-    user_input = input(f"{prompt}: ").strip()
+    user_input = get_raw_input(f"{prompt}: ").strip()
     
     if allow_backtrack and user_input.lower() in ['b', 'back', 'backtrack', '..']:
         return "##BACKTRACK##"
@@ -149,7 +206,7 @@ def get_text_input(prompt: str, allow_empty: bool = False, allow_backtrack: bool
 
 
 def get_number_input(prompt: str, min_val: int = None, max_val: int = None, allow_backtrack: bool = True):
-    user_input = input(f"{prompt}: ").strip()
+    user_input = get_raw_input(f"{prompt}: ").strip()
     
     if allow_backtrack and user_input.lower() in ['b', 'back', 'backtrack', '..']:
         return "##BACKTRACK##"
@@ -172,7 +229,6 @@ def get_number_input(prompt: str, min_val: int = None, max_val: int = None, allo
 
 
 def get_all_names_from_session_memos() -> list:
-    """Scan all session memos and extract contributor names"""
     names = []
     artists_path = Path.cwd() / "artists"
     
@@ -199,13 +255,8 @@ def get_all_names_from_session_memos() -> list:
 
 
 def get_candidates_from_history(field: str, history_obj) -> list:
-    """
-    Get candidates from history for a given field.
-    This properly gathers names from both sets, project entries, AND session memos.
-    """
     candidates = []
     
-    # Always include names from session memos
     memo_names = get_all_names_from_session_memos()
     candidates.extend(memo_names)
     
@@ -241,55 +292,33 @@ def get_input_with_completion(prompt: str, field: str, history_obj, allow_backtr
     """
     global _tip_shown
     
-    # Get candidates from history using the improved function
+    disable_tab_completion()
+    
     candidates = get_candidates_from_history(field, history_obj)
+    enable_tab_completion(candidates)
     
-    # Setup tab completion with candidates
-    setup_completion(candidates)
-    
-    # Show tip only ONCE per field per session
     is_real_readline = not isinstance(readline, DummyReadline)
     
-    # Only show the hint if:
-    # 1. There are candidates
-    # 2. We have a real readline
-    # 3. We haven't shown the tip for this field yet in this session
     if candidates and is_real_readline and not _tip_shown.get(field, False):
         field_display = field.capitalize()
         print_info(f"\nTip: Press TAB to autocomplete {field_display} names from history")
-        # # On Windows, show the list since pyreadline3 visual completion can be flaky
-        # if sys.platform == 'win32':
-        #     console.print("[dim]Available options (type number to select):[/dim]")
-        #     for i, name in enumerate(candidates[:15], 1):
-        #         console.print(f"  [cyan]{i}[/cyan] - {name}")
-        #     if len(candidates) > 15:
-        #         console.print(f"  [dim]... and {len(candidates) - 15} more[/dim]")
         _tip_shown[field] = True
     
-    while True:
-        user_input = input(f"{prompt}: ").strip()
-        
-        # Check for backtrack
-        if allow_backtrack and user_input.lower() in ['b', 'back', 'backtrack', '..']:
-            return "##BACKTRACK##"
-        
-        if not user_input:
-            print_error("Input cannot be empty. Please try again.")
-            continue
-        
-        # # On Windows, if it's a number, select by index
-        # if sys.platform == 'win32' and user_input.isdigit():
-        #     idx = int(user_input) - 1
-        #     if 0 <= idx < len(candidates):
-        #         return candidates[idx]
-        #     else:
-        #         print_error(f"Invalid selection. Please enter a number between 1 and {len(candidates)}")
-        #         continue
-        
-        # If there's a match in candidates, return the matched version (preserves case)
-        for candidate in candidates:
-            if candidate.lower() == user_input.lower():
-                return candidate
-        
-        # If no match, return the user's input as-is (allows new entries)
-        return user_input
+    try:
+        while True:
+            user_input = input(f"{prompt}: ").strip()
+            
+            if allow_backtrack and user_input.lower() in ['b', 'back', 'backtrack', '..']:
+                return "##BACKTRACK##"
+            
+            if not user_input:
+                print_error("Input cannot be empty. Please try again.")
+                continue
+            
+            for candidate in candidates:
+                if candidate.lower() == user_input.lower():
+                    return candidate
+            
+            return user_input
+    finally:
+        disable_tab_completion()
