@@ -11,7 +11,6 @@ from ..cli.prompts import get_confirmation
 from .project_tracker import ProjectTracker
 from .session_memo import SessionMemo, prompt_for_session_memo
 from ..utils.helpers import get_project_path, list_all_projects
-from .browser_flows import show_song_project_details
 from .open_project import ProjectOpener
 from .project_flows import manage_project_stage_flow
 
@@ -295,7 +294,7 @@ def search_projects_flow():
         try:
             if created_pretty != "Unknown" and 'T' in created_pretty:
                 dt = datetime.fromisoformat(created_pretty)
-                created_pretty = dt.strftime('%a %d %b %Y, %I:%M%p')
+                created_pretty = dt.strftime("%Y-%m-%d %H:%M")
         except:
             pass
         
@@ -529,7 +528,7 @@ def tasks_and_projects_flow(history):
                 try:
                     if 'T' in created_pretty:
                         dt = datetime.fromisoformat(created_pretty)
-                        created_pretty = dt.strftime('%a %d %b %Y, %I:%M%p')
+                        created_pretty = dt.strftime("%Y-%m-%d %H:%M")
                 except:
                     # If parsing fails, try to get from tracker
                     tracker = ProjectTracker(project["path"])
@@ -538,7 +537,7 @@ def tasks_and_projects_flow(history):
                         if created_str:
                             try:
                                 dt = datetime.fromisoformat(created_str)
-                                created_pretty = dt.strftime('%a %d %b %Y, %I:%M%p')
+                                created_pretty = dt.strftime("%Y-%m-%d %H:%M")
                             except:
                                 import time
                                 mod_time = project["path"].stat().st_ctime
@@ -559,7 +558,7 @@ def tasks_and_projects_flow(history):
                     if created_str:
                         try:
                             dt = datetime.fromisoformat(created_str)
-                            created_pretty = dt.strftime('%a %d %b %Y, %I:%M%p')
+                            created_pretty = dt.strftime("%Y-%m-%d %H:%M")
                         except:
                             import time
                             mod_time = project["path"].stat().st_ctime
@@ -626,7 +625,13 @@ def tasks_and_projects_flow(history):
     
     if choice == "1":
         if active_songs:
-            proj_choice = input("\nEnter the number of the project to open: ").strip()
+            proj_choice = input("\nEnter the number of the project to open (or 'b' to go back): ").strip().lower()
+            
+            # Add backtrack handling
+            if proj_choice == 'b':
+                tasks_and_projects_flow(history)
+                return
+            
             if proj_choice.isdigit():
                 idx = int(proj_choice) - 1
                 if 0 <= idx < len(active_songs):
@@ -664,7 +669,7 @@ def tasks_and_projects_flow(history):
                     tasks_and_projects_flow(history)
                     return
             else:
-                print_error("Please enter a valid number")
+                print_error("Please enter a valid number or 'b' to go back")
                 input("\nPress Enter to continue...")
                 tasks_and_projects_flow(history)
                 return
@@ -702,123 +707,3 @@ def tasks_and_projects_flow(history):
         input("\nPress Enter to continue...")
         tasks_and_projects_flow(history)
         return
-
-
-# ============================================================================
-# Task Action Handler - For use by other modules
-# ============================================================================
-
-def handle_task_action(action: str, task_data: Dict, config):
-    """
-    Handle a task action from the tasks system.
-    This is called when a user selects a task from the task list.
-    
-    Args:
-        action: The action to perform ('open_project', 'open_session', etc.)
-        task_data: Dictionary containing task information
-        config: UserConfig instance
-    """
-    from .open_project import open_project_from_task, open_session_direct
-    
-    if not task_data:
-        print_error("No task data provided")
-        return
-    
-    try:
-        if action == "open_project":
-            open_project_from_task(task_data, config)
-        elif action == "open_session":
-            session_path = task_data.get("session_path")
-            daw_code = task_data.get("daw_code")
-            
-            if not session_path:
-                print_error("No session path provided in task data")
-                return
-                
-            if not daw_code:
-                print_error("No DAW code provided in task data")
-                return
-                
-            open_session_direct(Path(session_path), daw_code, config)
-        else:
-            print_warning(f"Unknown task action: {action}")
-    except Exception as e:
-        print_error(f"Error handling task action: {e}")
-        import traceback
-        traceback.print_exc()
-
-
-# ============================================================================
-# Task System Integration Helper
-# ============================================================================
-
-class TaskActionHandler:
-    """
-    Handles task actions from the task system.
-    This is a class-based version for easier integration.
-    """
-    
-    def __init__(self, config):
-        self.config = config
-        self.opener = ProjectOpener(config)
-    
-    def handle(self, action: str, task_data: Dict) -> bool:
-        """
-        Handle a task action.
-        
-        Returns:
-            bool: True if action was handled successfully, False otherwise
-        """
-        if not task_data:
-            print_error("No task data provided")
-            return False
-        
-        try:
-            if action == "open_project":
-                self._open_project(task_data)
-                return True
-            elif action == "open_session":
-                self._open_session(task_data)
-                return True
-            else:
-                print_warning(f"Unknown task action: {action}")
-                return False
-        except Exception as e:
-            print_error(f"Error handling task: {e}")
-            import traceback
-            traceback.print_exc()
-            return False
-    
-    def _open_project(self, task_data: Dict):
-        """Open a project from task data"""
-        project_name = task_data.get("project")
-        artist = task_data.get("artist")
-        project_path = task_data.get("path")
-        
-        if project_path:
-            # Use path if provided
-            self.opener.open_project_interactive(Path(project_path))
-        elif project_name and artist:
-            # Find project by name and artist
-            found_path = self.opener.find_project(artist, project_name)
-            if found_path:
-                self.opener.open_project_interactive(found_path)
-            else:
-                print_error(f"Project '{project_name}' not found for artist '{artist}'")
-        else:
-            print_error("Insufficient task data: need project path or name+artist")
-    
-    def _open_session(self, task_data: Dict):
-        """Open a session from task data"""
-        session_path = task_data.get("session_path")
-        daw_code = task_data.get("daw_code")
-        
-        if not session_path:
-            print_error("No session path provided")
-            return
-        
-        if not daw_code:
-            print_error("No DAW code provided")
-            return
-        
-        self.opener.open_session(Path(session_path), daw_code)

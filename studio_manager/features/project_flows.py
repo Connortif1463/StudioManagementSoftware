@@ -22,7 +22,7 @@ def get_engineers(history):
         
         for i in range(num_input):
             while True:
-                # Use get_input_with_completion for engineer names
+                # Try with tab completion first, fallback to selection menu
                 engineer = get_input_with_completion(
                     f"\nEnter the name of engineer #{i+1}", 
                     "engineer",
@@ -44,9 +44,8 @@ def get_engineers(history):
                     engineers.append(engineer)
                     break
             
-            if engineers:
-                # Check if we need to continue or if the user cancelled
-                pass
+            if engineer == "##BACKTRACK##" and not engineers:
+                break
         
         if engineers:
             return engineers

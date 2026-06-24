@@ -14,14 +14,19 @@ from ..utils.constants import DAW_PATHS
 logging.basicConfig(level=logging.WARNING)
 
 TEMPLATES_BASE = Path.cwd() / "templates"
-TEMPLATE_CONFIG_FILE = Path.cwd() / ".template_config.json"
+
+
+def get_template_config_file() -> Path:
+    """Get the template config file path - resolves at runtime"""
+    return Path.cwd() / ".template_config.json"
 
 
 def load_template_config() -> dict:
     """Load the template configuration"""
-    if TEMPLATE_CONFIG_FILE.exists():
+    config_file = get_template_config_file()
+    if config_file.exists():
         try:
-            with open(TEMPLATE_CONFIG_FILE, 'r') as f:
+            with open(config_file, 'r') as f:
                 return json.load(f)
         except:
             pass
@@ -29,9 +34,17 @@ def load_template_config() -> dict:
 
 
 def save_template_config(config: dict):
-    """Save the template configuration"""
-    with open(TEMPLATE_CONFIG_FILE, 'w') as f:
-        json.dump(config, f, indent=2)
+    """Save the template configuration - creates parent directory if needed"""
+    config_file = get_template_config_file()
+    try:
+        # Ensure the parent directory exists
+        config_file.parent.mkdir(parents=True, exist_ok=True)
+        with open(config_file, 'w') as f:
+            json.dump(config, f, indent=2)
+    except Exception as e:
+        # If we can't save, just log and continue - not critical
+        logging.debug(f"Could not save template config: {e}")
+        pass
 
 
 def get_template_path(daw: str) -> Path:
@@ -80,38 +93,31 @@ def find_template_files(directory: Path, extension: str, max_depth: int = 5) -> 
         try:
             for item in path.iterdir():
                 if item.is_file():
-                    # Check if file has the right extension
                     if item.suffix.lower() == f".{extension.lower()}" or item.suffix.lower() == f".{extension}":
                         templates.append(item)
                 elif item.is_dir():
-                    # Don't skip any folders - search everything
                     walk_dir(item, depth + 1)
         except (PermissionError, OSError):
             pass
     
     walk_dir(directory)
     
-    # Remove duplicates and sort by modification time (most recent first)
     unique_templates = list(set(templates))
     return sorted(unique_templates, key=lambda x: x.stat().st_mtime, reverse=True)
 
 
 def suggest_template_path(daw: str) -> Optional[Path]:
-    """
-    Try to find a template file automatically by recursively searching.
-    Searches in templates folder and also in the project root.
-    """
+    """Try to find a template file automatically by recursively searching."""
     daw_info = DAW_PATHS.get(daw, {})
     ext = daw_info.get("ext", "").lstrip(".")
     
     if not ext:
         return None
     
-    # Search locations - look everywhere in the project
     search_locations = [
         Path.cwd() / "templates",
         Path.cwd(),
-        Path.cwd() / ".." / "templates",  # Parent directory
+        Path.cwd() / ".." / "templates",
     ]
     
     all_found = []
@@ -123,26 +129,18 @@ def suggest_template_path(daw: str) -> Optional[Path]:
     
     # Also search for DAW-specific folders by name
     for search_dir in [
-        "ableton templates",
-        "protools templates", 
-        "logic templates",
-        "ableton",
-        "protools",
-        "logic",
-        "templates",
-        "Template",
-        "Templates"
+        "ableton templates", "protools templates", "logic templates",
+        "ableton", "protools", "logic",
+        "templates", "Template", "Templates"
     ]:
         location = Path.cwd() / search_dir
         if location.exists():
             found = find_template_files(location, ext)
             all_found.extend(found)
     
-    # Remove duplicates and sort by modification time
     unique_found = list(set(all_found))
     
     if unique_found:
-        # Return the most recently modified one
         return sorted(unique_found, key=lambda x: x.stat().st_mtime, reverse=True)[0]
     
     return None
@@ -157,15 +155,10 @@ def check_template(daw: str) -> bool:
 
 
 def ensure_template_exists(daw: str) -> Optional[Path]:
-    """
-    Ensure a template exists for the given DAW.
-    If not found, try to auto-detect it by recursive search.
-    Returns the template path or None if not found.
-    """
+    """Ensure a template exists for the given DAW."""
     # First check if we have a valid template from saved config
     template_path = get_template_path(daw)
     if template_path and template_path.exists():
-        print_success(f"Using saved template: {template_path}")
         return template_path
     
     # Try to auto-detect recursively
@@ -173,7 +166,6 @@ def ensure_template_exists(daw: str) -> Optional[Path]:
     found_path = suggest_template_path(daw)
     
     if found_path:
-        # Save the found path for future use
         config = load_template_config()
         config[daw] = str(found_path)
         save_template_config(config)
@@ -188,7 +180,6 @@ def ensure_template_exists(daw: str) -> Optional[Path]:
             default_path.touch()
             print_warning(f"No template found. Created empty template: {default_path}")
             print_warning("Please replace this with a real template file.")
-            # Save the empty template path
             config = load_template_config()
             config[daw] = str(default_path)
             save_template_config(config)
@@ -201,19 +192,14 @@ def ensure_template_exists(daw: str) -> Optional[Path]:
 
 
 def create_session_from_template(name: str, artist: str, daw: str, stage: str = "production") -> bool:
-    """
-    Create a new session from template inside the specified stage folder.
-    Stages: production, mix, master
-    """
+    """Create a new session from template inside the specified stage folder."""
     try:
-        # Ensure template exists (auto-detect or create)
         template_path = ensure_template_exists(daw)
         
         if not template_path:
             print_error(f"Could not find or create template for {daw}")
             return False
         
-        # Get DAW info
         daw_info = DAW_PATHS.get(daw, {})
         if not daw_info:
             print_error(f"Unknown DAW: {daw}")
@@ -224,11 +210,9 @@ def create_session_from_template(name: str, artist: str, daw: str, stage: str = 
             print_error(f"No folder defined for DAW: {daw}")
             return False
         
-        # Create session inside the stage folder
         session_dir = Path.cwd() / "artists" / artist / name / stage / daw_folder
         session_dir.mkdir(parents=True, exist_ok=True)
         
-        # Create session filename with stage info
         ext = daw_info.get("ext", "")
         session_filename = f"{name}_{stage}_session{ext}"
         destination = session_dir / session_filename
@@ -254,18 +238,21 @@ def diagnose_template_issue():
     print_info("\n[bold]Template Diagnostics:[/bold]")
     print_info(f"Working directory: {Path.cwd()}")
     print_info(f"Templates base: {TEMPLATES_BASE}")
+    print_info(f"Config file: {get_template_config_file()}")
     
     if TEMPLATES_BASE.exists():
         print_info(f"Templates folder exists: Yes")
         print_info("Searching for templates recursively...")
         
-        # Search for all .als files
         found = find_template_files(TEMPLATES_BASE, "als")
         if found:
             print_info(f"Found {len(found)} .als files:")
             for f in found[:10]:
-                rel_path = f.relative_to(Path.cwd())
-                print_info(f"  📄 {rel_path}")
+                try:
+                    rel_path = f.relative_to(Path.cwd())
+                    print_info(f"  📄 {rel_path}")
+                except:
+                    print_info(f"  📄 {f}")
             if len(found) > 10:
                 print_info(f"  ... and {len(found) - 10} more")
         else:

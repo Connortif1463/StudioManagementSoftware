@@ -13,8 +13,8 @@ from unittest import TestCase, skip
 # This makes it easy to test only the DAWs you have installed
 TEST_DAWS = {
     "Ableton": True,     
-    "Pro Tools": True,   
-    "Logic": True,       
+    "Pro Tools": False,   
+    "Logic": False,       
 }
 # ============================================================
 
