@@ -24,7 +24,7 @@ def backup_project_flow(project_path: Path):
     console.print("  [cyan]1[/cyan] - Backup current stage")
     console.print("  [cyan]2[/cyan] - Backup a specific stage")
     console.print("  [cyan]3[/cyan] - List existing backups")
-    console.print("  [blue]b[/blue] - Go back")
+    console.print("  [cyan]b[/cyan] - Go back")
     
     choice = get_raw_input("\nSelect option: ").strip()
     
@@ -92,7 +92,7 @@ def global_backup_flow():
     console.print(f"\n[bold]Backup Options:[/bold]")
     console.print("  [cyan]1[/cyan] - Backup a single project")
     console.print("  [cyan]2[/cyan] - Backup all projects")
-    console.print("  [blue]b[/blue] - Go back")
+    console.print("  [cyan]b[/cyan] - Go back")
     
     backup_choice = get_raw_input("\nSelect option: ").strip()
     

@@ -646,7 +646,7 @@ class ProjectOpener:
         table.add_column("Project", style="green")
         table.add_column("Artist", style="yellow")
         table.add_column("Stage", style="magenta")
-        table.add_column("Category", style="blue")
+        table.add_column("Category", style="cyan")
         
         for idx, project in enumerate(projects, 1):
             table.add_row(

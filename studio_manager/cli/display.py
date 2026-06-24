@@ -59,7 +59,7 @@ def show_recent_projects_table(projects: list):
     table.add_column("Date & Time", style="cyan")
     table.add_column("Project Name", style="green")
     table.add_column("Artist", style="yellow")
-    table.add_column("Type", style="blue")
+    table.add_column("Type", style="cyan")
     table.add_column("Engineers", style="white")
     
     for project in projects:

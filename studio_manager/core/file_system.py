@@ -96,7 +96,7 @@ def print_directory_tree(path: Path, max_depth: int = 3):
                     if item.suffix in ['.als', '.ptx', '.logicx']:
                         tree_node.add(f"[green]{item.name}[/green] [dim]({size_str})[/dim] [dim]🎛️[/dim]")
                     elif item.suffix in ['.wav', '.aif', '.aiff', '.mp3']:
-                        tree_node.add(f"[blue]{item.name}[/blue] [dim]({size_str})[/dim]")
+                        tree_node.add(f"[cyan]{item.name}[/cyan] [dim]({size_str})[/dim]")
                     else:
                         tree_node.add(f"[dim]{item.name}[/dim] [dim]({size_str})[/dim]")
         except PermissionError:
@@ -145,7 +145,7 @@ def print_full_project_tree():
                                             if item.suffix in ['.als', '.ptx', '.logicx']:
                                                 stage_branch.add(f"[green]{item.name}[/green] [dim](DAW Session)[/dim]")
                                             elif item.suffix in ['.wav', '.aif', '.aiff', '.mp3']:
-                                                stage_branch.add(f"[blue]{item.name}[/blue]")
+                                                stage_branch.add(f"[cyan]{item.name}[/cyan]")
                                             elif item.name == "README.txt":
                                                 pass
                                             else:
