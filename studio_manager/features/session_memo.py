@@ -9,7 +9,7 @@ from typing import Dict, List, Optional
 from rich.panel import Panel
 from rich.table import Table
 from ..cli.display import console, print_header, print_separator, print_success, print_info, print_error, print_warning, print_dim, clear_screen
-from ..cli.prompts import get_text_input, get_choice, get_confirmation, enable_tab_completion, disable_tab_completion
+from ..cli.prompts import get_text_input, get_choice, get_confirmation, enable_tab_completion, disable_tab_completion, get_raw_input
 from ..data.history import ProjectHistory
 
 # Define DummyReadline at the module level FIRST

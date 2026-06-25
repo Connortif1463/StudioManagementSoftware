@@ -79,7 +79,7 @@ def get_project_category():
     console.print("  [cyan]2[/cyan] - Live Recording")
     console.print("  [cyan]3[/cyan] - Demo")
     console.print("  [cyan]4[/cyan] - Equipment Test")
-    console.print("  [cyan]5[/cyan] - Fun [cyan]/[/cyan] Experiment")
+    console.print("  [cyan]5[/cyan] - Fun / Experiment")
     console.print("  [cyan]b[/cyan] - Go back")
     
     category_choice = get_raw_input("\nSelect category: ").strip().lower()
@@ -137,6 +137,7 @@ def new_project_flow(history):
         if project_type == "##BACKTRACK##":
             return
         
+        # get_input_with_completion now shows available options automatically
         artist = get_input_with_completion("\nEnter the name of the artist", "artist", history, allow_backtrack=True)
         if artist == "##BACKTRACK##":
             return

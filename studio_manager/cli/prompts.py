@@ -53,14 +53,14 @@ if readline is None:
     readline = DummyReadline()
     READLINE_TYPE = "Dummy"
 
-# Initialize readline settings - make 'b' a normal character
+# Initialize readline - CRITICAL: Unbind 'b' from backward-char on macOS
 if not isinstance(readline, DummyReadline):
     try:
         readline.parse_and_bind("tab: self-insert")
         if sys.platform == 'darwin':
             try:
-                readline.parse_and_bind('"b": self-insert')
-                readline.parse_and_bind('"B": self-insert')
+                readline.parse_and_bind('b: self-insert')
+                readline.parse_and_bind('B: self-insert')
             except:
                 pass
     except:
@@ -101,8 +101,8 @@ class CustomCompleter:
         return None
 
 
-def enable_tab_completion(options):
-    """Enable tab completion with the given options"""
+def setup_completion(options):
+    """Setup tab completion with proper cycling"""
     if isinstance(readline, DummyReadline) or not readline:
         return
     
@@ -120,6 +120,11 @@ def enable_tab_completion(options):
                     readline.parse_and_bind("tab: complete")
                 except:
                     pass
+                try:
+                    readline.parse_and_bind('b: self-insert')
+                    readline.parse_and_bind('B: self-insert')
+                except:
+                    pass
             else:
                 readline.parse_and_bind("tab: complete")
                 readline.parse_and_bind("set show-all-if-ambiguous on")
@@ -130,41 +135,47 @@ def enable_tab_completion(options):
         pass
 
 
-def disable_tab_completion():
-    """Disable tab completion and restore normal character input"""
+def clear_completion():
+    """Clear the completer and restore normal behavior"""
     if isinstance(readline, DummyReadline) or not readline:
         return
     
     try:
         if hasattr(readline, 'set_completer'):
             readline.set_completer(None)
-        
         try:
             readline.parse_and_bind("tab: self-insert")
         except:
             pass
-        
         if sys.platform == 'darwin':
             try:
-                readline.parse_and_bind('"b": self-insert')
-                readline.parse_and_bind('"B": self-insert')
+                readline.parse_and_bind('b: self-insert')
+                readline.parse_and_bind('B: self-insert')
             except:
                 pass
     except Exception as e:
         pass
 
 
+# Aliases for session_memo.py
+def enable_tab_completion(options):
+    """Alias for setup_completion - used by session_memo.py"""
+    setup_completion(options)
+
+def disable_tab_completion():
+    """Alias for clear_completion - used by session_memo.py"""
+    clear_completion()
+
+
 def get_raw_input(prompt: str) -> str:
-    """Get input without any readline interference"""
-    disable_tab_completion()
+    """Get input with completion disabled"""
+    clear_completion()
     return input(prompt)
 
 
 def get_choice(prompt: str, choices: list, default: str = None) -> str:
-    """Get a choice from the user with Rich formatting"""
-    disable_tab_completion()
+    clear_completion()
     
-    # Format choices with color using Rich
     choices_display = "/".join([f"[cyan]{c}[/cyan]" for c in choices])
     console.print(f"{prompt} [{choices_display}]", end=" ")
     
@@ -178,8 +189,7 @@ def get_choice(prompt: str, choices: list, default: str = None) -> str:
 
 
 def get_confirmation(prompt: str) -> bool:
-    """Get yes/no confirmation with Rich formatting"""
-    disable_tab_completion()
+    clear_completion()
     
     console.print(f"{prompt} [cyan]y[/cyan]/[cyan]n[/cyan]: ", end="")
     
@@ -257,6 +267,7 @@ def get_all_names_from_session_memos() -> list:
 def get_candidates_from_history(field: str, history_obj) -> list:
     candidates = []
     
+    # First, get names from session memos (works even with no projects)
     memo_names = get_all_names_from_session_memos()
     candidates.extend(memo_names)
     
@@ -287,21 +298,20 @@ def get_candidates_from_history(field: str, history_obj) -> list:
 
 def get_input_with_completion(prompt: str, field: str, history_obj, allow_backtrack: bool = True) -> str:
     """
-    Get user input with tab completion from history data.
-    Supports cycling through options with TAB.
+    Get user input with TAB completion from history.
+    On macOS, 'b' is explicitly bound to self-insert so it works as a normal character.
     """
     global _tip_shown
     
-    disable_tab_completion()
-    
     candidates = get_candidates_from_history(field, history_obj)
-    enable_tab_completion(candidates)
+    setup_completion(candidates)
     
     is_real_readline = not isinstance(readline, DummyReadline)
     
     if candidates and is_real_readline and not _tip_shown.get(field, False):
         field_display = field.capitalize()
         print_info(f"\n[cyan]Tip: Press TAB to autocomplete {field_display} names from history[/cyan]")
+        print_info("[dim]Type 'b' and press Enter to go back[/dim]")
         _tip_shown[field] = True
     
     try:
@@ -321,4 +331,4 @@ def get_input_with_completion(prompt: str, field: str, history_obj, allow_backtr
             
             return user_input
     finally:
-        disable_tab_completion()
+        clear_completion()
