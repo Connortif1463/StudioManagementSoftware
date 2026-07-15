@@ -1,7 +1,6 @@
 # studio_manager/main.py
 
 import sys
-import traceback
 import readline
 from pathlib import Path
 from rich.panel import Panel
@@ -17,6 +16,7 @@ from .features.backup_flows import global_backup_flow
 from .features.tasks_flows import tasks_and_projects_flow
 from .features.browser_flows import project_browser_flow
 from .features.album_flows import album_management_flow, set_album_history
+from .features.bug_report_flows import bug_report_flow
 from .utils.helpers import list_all_projects
 
 # Initialize
@@ -64,8 +64,10 @@ def main():
                 file_tree_flow()
             elif objective == "6":
                 global_backup_flow()
+            elif objective == "7":
+                bug_report_flow()
             else:
-                print_error("\nInvalid option. Please choose 1, 2, 3, 4, 5, 6, or q")
+                print_error("\nInvalid option. Please choose 1, 2, 3, 4, 5, 6, 7, or q")
                 input("\nPress Enter to continue...")
                 
         except KeyboardInterrupt:

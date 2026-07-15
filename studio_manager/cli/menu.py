@@ -1,3 +1,5 @@
+# studio_manager/cli/menu.py
+
 from rich.panel import Panel
 from rich import print as rprint
 from .display import console, print_menu
@@ -24,15 +26,10 @@ def show_main_menu():
 [cyan]6[/cyan] - Backup System
     Create and manage project backups
 
+[cyan]7[/cyan] - Bug Report
+    Submit and view bug reports
+
 [cyan]q[/cyan] - Quit
     Exit the application
 """
     print_menu(menu_text, title="Studio Management System")
-
-def show_file_tree_options():
-    """Display file tree options"""
-    console.print("\n[bold]Options:[/bold]")
-    console.print("  1 - Show full project structure (artists folder)")
-    console.print("  2 - Show current working directory tree")
-    console.print("  3 - Show specific directory tree")
-    console.print("  b - Return to main menu")

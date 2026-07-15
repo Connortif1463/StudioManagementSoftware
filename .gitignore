@@ -38,3 +38,4 @@ desktop.ini
 *.egg-info/
 dist/
 build/
+.template_config.json

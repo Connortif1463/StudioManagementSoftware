@@ -9,3 +9,4 @@ from .album_flows import album_management_flow
 from .backup_flows import global_backup_flow
 from .file_tree import file_tree_flow
 from .daw_integration import get_daw_info, open_daw_project
+from .bug_report_flows import bug_report_flow, write_bug_report, list_bug_reports
