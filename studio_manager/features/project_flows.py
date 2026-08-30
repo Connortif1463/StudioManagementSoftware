@@ -4,6 +4,7 @@
 import traceback
 from pathlib import Path
 from rich.panel import Panel
+from studio_manager.features.album_flows import album_management_flow
 from ..cli.display import clear_screen, console, print_success, print_error, print_warning, print_info
 from ..cli.prompts import get_confirmation, get_text_input, get_choice, get_number_input, get_input_with_completion, get_raw_input
 from ..core.project_manager import create_project
@@ -64,7 +65,8 @@ def get_project_name():
 
 def get_project_type():
     """Get and validate project type with backtracking"""
-    return get_choice("\nEnter S for Song, or A for Album", ["S", "A"])
+    # return get_choice("\nEnter S for Song, or A for Album", ["S", "A"])
+    return "S"  # Default to Song for now, as Album flow is not fully implemented yet
 
 
 def get_daw():
@@ -147,6 +149,8 @@ def new_project_flow(history):
             daw = get_daw()
             if daw == "##BACKTRACK##":
                 return
+        # if project_type == "A":
+        #     album_management_flow()
         
         project_category = get_project_category()
         if project_category == "##BACKTRACK##":
