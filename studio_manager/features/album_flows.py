@@ -252,8 +252,8 @@ def album_management_flow():
     choice = input("\nSelect option: ").strip()
     
     if choice == "1":
-        if _history and len(_history.data["artists"]) > 0:
-            print_info("\nTip: Press TAB to see available artists from history")
+        # if _history and len(_history.data["artists"]) > 0:
+        #     print_info("\nTip: Press TAB to see available artists from history")
         artist = get_input_with_completion("\nArtist name", "artist", _history, allow_backtrack=False)
         
         if artist == "##BACKTRACK##":
