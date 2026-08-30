@@ -647,12 +647,17 @@ class SessionMemo:
                 ))
             
             console.print(f"\n[bold cyan]Date:[/bold cyan] [yellow]{memo['date']} at {memo['time']}[/yellow]")
+
+            if memo.get("is_standalone"):
+                console.print("[bold]Type:[/bold] [yellow]Standalone Memo[/yellow]")
             
             if memo.get("session_files"):
                 console.print("\n[bold]Session Files:[/bold]")
                 for f in memo["session_files"]:
                     primary = " [bold cyan](Primary)[/bold cyan]" if f.get("is_primary") else ""
                     console.print(f"  - {f['name']}{primary}")
+            else:
+                console.print("\n[dim]No session files associated[/dim]")
             
             console.print("\n[bold]Contributors:[/bold]")
             for c in memo["contributors"]:
