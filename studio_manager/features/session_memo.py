@@ -651,6 +651,7 @@ class SessionMemo:
             nav_options.append("[cyan]f[/cyan] - First (Most Recent)")
             nav_options.append("[cyan]l[/cyan] - Last (Oldest)")
             nav_options.append("[cyan]e[/cyan] - Edit this memo")
+            nav_options.append("[cyan]z[/cyan] - Create a new memo")
             nav_options.append("[cyan]q[/cyan] - Quit")
             
             console.print("  ".join(nav_options))
@@ -674,6 +675,8 @@ class SessionMemo:
                 total = len(sessions)
                 if current_idx >= total:
                     current_idx = total - 1
+            elif choice == 'z':
+                prompt_for_session_memo(self.project_path, _history, is_manual=True)
             else:
                 if choice:
                     print_error("Invalid choice")
@@ -725,7 +728,7 @@ def prompt_for_session_memo(project_path: Path, history_obj: ProjectHistory = No
     """
     Prompt user for session memo.
     - If called after DAW session: create new memo with session file metadata
-    - If called manually from menu: ONLY view/edit existing memos
+    - If called manually from menu: ONLY view/edit existing memos (maybe not anymore) or create a new memo
     """
     global _history
     _history = history_obj
@@ -739,12 +742,14 @@ def prompt_for_session_memo(project_path: Path, history_obj: ProjectHistory = No
             print_warning("No session memos found for this project")
             return None
         
-        memo.view_last_memo()
+        # if get_confirmation("\nView the most recent session memo?"):
+        #     memo.view_last_memo()
         
         print_separator()
         console.print("\n[bold]Options:[/bold]")
         console.print("  [cyan]1[/cyan] - Add to this memo")
         console.print("  [cyan]2[/cyan] - View all memos")
+        console.print("  [cyan]3[/cyan] - Create a new memo")
         console.print("  [cyan]b[/cyan] - Go back")
         
         choice = input("\nSelect option: ").strip()
@@ -753,6 +758,10 @@ def prompt_for_session_memo(project_path: Path, history_obj: ProjectHistory = No
             return memo.edit_last_memo()
         elif choice == "2":
             memo.view_memos(interactive=True)
+            return None
+        elif choice == "3":
+            return prompt_for_session_memo(project_path, history_obj, is_manual=False, selected_session=selected_session, affected_sessions=affected_sessions)
+        elif choice == "b":
             return None
         else:
             return None

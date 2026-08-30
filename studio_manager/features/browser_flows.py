@@ -53,6 +53,7 @@ def show_song_project_details(selected: dict, history):
     console.print("  3 - Manage project stage")
     console.print("  4 - Create backup")
     console.print("  5 - Set expected release date")
+    console.print("  6 - Create a new session memo")
     console.print("  b - Go back")
     
     action = input("\nSelect option: ").strip()
@@ -99,6 +100,8 @@ def show_song_project_details(selected: dict, history):
         from .tasks_flows import set_release_date_flow
         set_release_date_flow()
         input("\nPress Enter to continue...")
+    elif action == "6":
+        prompt_for_session_memo(project_path, history, is_manual=True)
     elif action == "b":
         return
     else:

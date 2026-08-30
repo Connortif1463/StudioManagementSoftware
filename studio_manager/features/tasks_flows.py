@@ -461,6 +461,10 @@ def filter_by_category_flow(history):
                 continue
         input("\nPress Enter to continue...")
 
+    # adding option to create a session memo for the selected project
+    elif action == '6':
+        prompt_for_session_memo(project_path, history, is_manual=True)
+
 
 def tasks_and_projects_flow(history):
     """Tasks and Projects - view statistics, memos, finished projects, search"""
@@ -592,6 +596,7 @@ def tasks_and_projects_flow(history):
     console.print("  [cyan]3[/cyan] - Set expected release date for a project")
     console.print("  [cyan]4[/cyan] - Search for a project")
     console.print("  [cyan]5[/cyan] - Filter by project category")
+    # console.print("  [cyan]6[/cyan] - Create a session memo for a project")
     console.print("  [cyan]b[/cyan] - Go back")
     
     choice = get_raw_input("\nSelect option: ").strip().lower()
@@ -667,6 +672,11 @@ def tasks_and_projects_flow(history):
         filter_by_category_flow(history)
         tasks_and_projects_flow(history)
         return
+    
+    # elif choice == "6":
+    #     prompt_for_session_memo(history)
+    #     tasks_and_projects_flow(history)
+    #     return
     
     elif choice == 'b':
         return
