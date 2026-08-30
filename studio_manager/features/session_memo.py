@@ -271,47 +271,77 @@ class SessionMemo:
     def create_memo(self, selected_session: Dict = None, affected_sessions: List[Dict] = None):
         """
         Create a new session memo.
-        The session files are passed in as metadata from the previous selection.
-        No need to re-confirm - they were already selected.
+        If selected_session is None, creates a standalone memo without file association.
         """
         print_header("Session Memo")
         
+        # If no session was provided, create a standalone memo
         if selected_session is None:
-            print_error("No session file provided. Cannot create memo.")
-            return None
+            print_info("\n[bold]Creating standalone session memo[/bold]")
+            print_info("[dim]This memo will not be associated with a specific session file.[/dim]")
+            print_info("[dim]You can still record who was there, what was accomplished, and notes.[/dim]")
+            
+            if not get_confirmation("\nContinue with standalone memo?"):
+                return None
+            
+            # Create memo without session files
+            memo = {
+                "timestamp": datetime.now().isoformat(),
+                "date": datetime.now().strftime("%Y-%m-%d"),
+                "time": datetime.now().strftime("%H:%M:%S"),
+                "session_files": [],
+                "contributors": [],
+                "tasks_completed": [],
+                "notes": "",
+                "files_created": [],
+                "is_standalone": True  # Flag to indicate this is a standalone memo
+            }
+            
+            # Skip session file display and go straight to contributors
+        else:
+            # Original behavior with session files
+            memo = {
+                "timestamp": datetime.now().isoformat(),
+                "date": datetime.now().strftime("%Y-%m-%d"),
+                "time": datetime.now().strftime("%H:%M:%S"),
+                "session_files": [],
+                "contributors": [],
+                "tasks_completed": [],
+                "notes": "",
+                "files_created": []
+            }
+            
+            memo["session_files"].append({
+                "path": str(selected_session["path"]),
+                "name": selected_session["name"],
+                "stage": selected_session.get("stage", "unknown"),
+                "parent": selected_session.get("parent_folder", ""),
+                "is_primary": True,
+                "last_modified": selected_session.get("last_modified_pretty", "")
+            })
+            
+            if affected_sessions:
+                for session in affected_sessions:
+                    if session["path"] != selected_session["path"]:
+                        memo["session_files"].append({
+                            "path": str(session["path"]),
+                            "name": session["name"],
+                            "stage": session.get("stage", "unknown"),
+                            "parent": session.get("parent_folder", ""),
+                            "is_primary": False,
+                            "last_modified": session.get("last_modified_pretty", "")
+                        })
+            
+            # Show the session files that will be recorded
+            console.print("\n[bold]Session files being recorded:[/bold]")
+            for idx, f in enumerate(memo["session_files"], 1):
+                primary = " [bold cyan](Primary)[/bold cyan]" if f.get("is_primary") else ""
+                console.print(f"  {idx}. {f['name']}{primary}")
+            
+            if not get_confirmation("\nIs this correct?"):
+                return None
         
-        memo = {
-            "timestamp": datetime.now().isoformat(),
-            "date": datetime.now().strftime("%Y-%m-%d"),
-            "time": datetime.now().strftime("%H:%M:%S"),
-            "session_files": [],
-            "contributors": [],
-            "tasks_completed": [],
-            "notes": "",
-            "files_created": []
-        }
-        
-        memo["session_files"].append({
-            "path": str(selected_session["path"]),
-            "name": selected_session["name"],
-            "stage": selected_session.get("stage", "unknown"),
-            "parent": selected_session.get("parent_folder", ""),
-            "is_primary": True,
-            "last_modified": selected_session.get("last_modified_pretty", "")
-        })
-        
-        if affected_sessions:
-            for session in affected_sessions:
-                if session["path"] != selected_session["path"]:
-                    memo["session_files"].append({
-                        "path": str(session["path"]),
-                        "name": session["name"],
-                        "stage": session.get("stage", "unknown"),
-                        "parent": session.get("parent_folder", ""),
-                        "is_primary": False,
-                        "last_modified": session.get("last_modified_pretty", "")
-                    })
-        
+        # Get contributors (shared logic for both cases)
         all_names = get_all_names_from_history()
         
         console.print("\n[bold]Who was at this session?[/bold]")
@@ -354,6 +384,7 @@ class SessionMemo:
             print_warning("No contributors added. Skipping memo.")
             return None
         
+        # Get tasks
         console.print("\n[bold]What was accomplished?[/bold]")
         print_info("Enter tasks one by one. Press Enter with no text to finish.")
         while True:
@@ -363,6 +394,7 @@ class SessionMemo:
             memo["tasks_completed"].append(task)
             print_success(f"Added task: {task}")
         
+        # Get notes
         notes = input("\nAdditional notes (or press Enter to skip): ").strip()
         if notes:
             memo["notes"] = notes
@@ -373,9 +405,13 @@ class SessionMemo:
         print_separator()
         print_success("Session memo saved successfully!")
         
+        # Summary
         console.print("\n[bold]Session Summary:[/bold]")
         console.print(f"  Date: [cyan]{memo['date']} at {memo['time']}[/cyan]")
-        console.print(f"  Session Files: [green]{len(memo['session_files'])}[/green]")
+        if memo.get("is_standalone"):
+            console.print("  Type: [yellow]Standalone Memo[/yellow]")
+        else:
+            console.print(f"  Session Files: [green]{len(memo['session_files'])}[/green]")
         console.print(f"  Contributors: [green]{', '.join([c['name'] for c in memo['contributors']])}[/green]")
         console.print(f"  Tasks: [green]{len(memo['tasks_completed'])} completed[/green]")
         
