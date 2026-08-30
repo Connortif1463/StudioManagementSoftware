@@ -786,26 +786,29 @@ def prompt_for_session_memo(project_path: Path, history_obj: ProjectHistory = No
         # if get_confirmation("\nView the most recent session memo?"):
         #     memo.view_last_memo()
         
-        print_separator()
-        console.print("\n[bold]Options:[/bold]")
-        console.print("  [cyan]1[/cyan] - Add to this memo")
-        console.print("  [cyan]2[/cyan] - View all memos")
-        console.print("  [cyan]3[/cyan] - Create a new memo")
-        console.print("  [cyan]b[/cyan] - Go back")
+        # print_separator()
+        # console.print("\n[bold]Options:[/bold]")
+        # console.print("  [cyan]1[/cyan] - Add to this memo")
+        # console.print("  [cyan]2[/cyan] - View all memos")
+        # console.print("  [cyan]3[/cyan] - Create a new memo")
+        # console.print("  [cyan]b[/cyan] - Go back")
         
-        choice = input("\nSelect option: ").strip()
+        # choice = input("\nSelect option: ").strip()
         
-        if choice == "1":
-            return memo.edit_last_memo()
-        elif choice == "2":
-            memo.view_memos(interactive=True)
-            return None
-        elif choice == "3":
-            return prompt_for_session_memo(project_path, history_obj, is_manual=False, selected_session=selected_session, affected_sessions=affected_sessions)
-        elif choice == "b":
-            return None
-        else:
-            return None
+        # if choice == "1":
+        #     return memo.edit_last_memo()
+        # elif choice == "2":
+        #     memo.view_memos(interactive=True)
+        #     return None
+        # elif choice == "3":
+        #     return memo.create_memo(selected_session, affected_sessions)
+        # elif choice == "b":
+        #     return None
+        # else:
+        #     return None
+
+        return memo.create_memo(selected_session, affected_sessions)
+
     else:
         print_separator()
         if get_confirmation("\nRecord session notes and contributor information?"):

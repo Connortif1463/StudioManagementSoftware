@@ -462,8 +462,8 @@ def filter_by_category_flow(history):
         input("\nPress Enter to continue...")
 
     # adding option to create a session memo for the selected project
-    elif action == '6':
-        prompt_for_session_memo(project_path, history, is_manual=True)
+    # elif action == '6':
+    #     prompt_for_session_memo(project_path, history, is_manual=True)
 
 
 def tasks_and_projects_flow(history):
